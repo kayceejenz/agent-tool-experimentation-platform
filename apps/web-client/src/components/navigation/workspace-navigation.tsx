@@ -53,6 +53,7 @@ const groups = [
 		items: [{ label: 'Runs', slug: 'runs', icon: PlayCircle }],
 	},
 ];
+
 export function WorkspaceNavigation({
 	onNavigate,
 }: {
@@ -64,6 +65,7 @@ export function WorkspaceNavigation({
 	const project =
 		projects.find(item => item.id === pathParts[2]) ?? projects[0];
 	const base = project ? `/projects/${project.id}` : undefined;
+
 	function navLink(
 		href: string | undefined,
 		label: string,
@@ -80,9 +82,11 @@ export function WorkspaceNavigation({
 					<span>{label}</span>
 				</span>
 			);
+
 		const active = exact
 			? pathname === href
 			: pathname === href || pathname.startsWith(`${href}/`);
+
 		return (
 			<Link
 				key={href}
@@ -95,6 +99,7 @@ export function WorkspaceNavigation({
 			</Link>
 		);
 	}
+
 	return (
 		<nav
 			className='structured-nav'

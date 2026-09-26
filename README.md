@@ -11,8 +11,18 @@ In a separate terminal:
 ```sh
 cd apps/server
 uv sync --locked
-cp .env.example .env
+cp -n .env.example .env
+
 uv run --locked agent-platform-api
+```
+
+### Database migrations
+
+From `apps/server`:
+
+```sh
+uv run --locked agent-platform-migrate --status
+uv run --locked agent-platform-migrate
 ```
 
 ### Web client
@@ -32,5 +42,3 @@ pnpm typecheck
 pnpm build
 pnpm start
 ```
-
-Stop the development process before starting production preview on the same port.

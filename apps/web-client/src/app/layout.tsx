@@ -4,7 +4,6 @@ import '@fontsource/outfit/400.css';
 import '@fontsource/outfit/500.css';
 import '@fontsource/outfit/600.css';
 import '@fontsource/outfit/700.css';
-import { AppShell } from '@/components/layout/app-shell';
 import { themeScript } from '@/lib/theme';
 import './globals.css';
 
@@ -24,9 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 					}}
 				/>
 			</head>
-			<body>
-				<AppShell>{children}</AppShell>
-			</body>
+			<body>{children}</body>
 		</html>
 	);
 }

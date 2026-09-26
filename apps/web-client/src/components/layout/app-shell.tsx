@@ -2,10 +2,18 @@
 import Link from 'next/link';
 import { useRef, useState, type ReactNode } from 'react';
 import { Menu, X } from 'lucide-react';
+import { AccountMenu } from '@/components/auth/account-menu';
+import type { AuthUser } from '@/lib/auth/shared';
 import { WorkspaceNavigation } from '@/components/navigation/workspace-navigation';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+	children,
+	user,
+}: {
+	children: ReactNode;
+	user: AuthUser;
+}) {
 	const [open, setOpen] = useState(false);
 	const menuButton = useRef<HTMLButtonElement>(null);
 	function close() {
@@ -58,6 +66,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 						}}
 					/>
 					<div className='rail-footer'>
+						<AccountMenu user={user} />
 						<ThemeToggle />
 					</div>
 				</div>

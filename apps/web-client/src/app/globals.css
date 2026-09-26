@@ -653,7 +653,11 @@ p {
 }
 .project-context-switcher:hover,
 .project-context-switcher:focus-within {
-	border-color: color-mix(in srgb, var(--nav-muted) 55%, var(--nav-border));
+	border-color: color-mix(
+		in srgb,
+		var(--nav-muted) 55%,
+		var(--nav-border)
+	);
 	background: var(--nav-hover);
 }
 .project-switcher-icon {
@@ -874,4 +878,232 @@ p {
 }
 .workflow-card:not(a):hover {
 	border-color: var(--line);
+}
+
+/* Authentication follows the reference card layout, using agent theme tokens. */
+.signin-page {
+	position: relative;
+	min-height: 100dvh;
+	display: grid;
+	place-items: center;
+	padding: 24px;
+	overflow: hidden;
+}
+.signin-decoration {
+	position: absolute;
+	top: -20%;
+	left: 50%;
+	width: 600px;
+	height: 600px;
+	transform: translateX(-50%);
+	background: radial-gradient(
+		circle,
+		color-mix(in srgb, var(--accent) 8%, transparent),
+		transparent 70%
+	);
+	pointer-events: none;
+}
+.signin-card {
+	position: relative;
+	width: min(400px, 100%);
+	display: grid;
+	gap: 24px;
+	padding: 36px 32px;
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	background: var(--panel);
+	box-shadow: var(--shadow);
+}
+.signin-card-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.signin-brand {
+	display: grid;
+	gap: 2px;
+}
+.signin-brand-text {
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: var(--accent);
+}
+.signin-product {
+	font-size: 11px;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+}
+.signin-card .theme-toggle {
+	width: auto;
+	padding: 9px;
+}
+.signin-card .theme-toggle span {
+	display: none;
+}
+.signin-copy h1 {
+	margin: 0;
+	font-size: 24px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+}
+.signin-copy p {
+	margin: 6px 0 0;
+	color: var(--muted);
+	font-size: 14px;
+}
+.auth-tabs {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 3px;
+	padding: 3px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--subtle);
+}
+.auth-tabs button {
+	min-height: 36px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 600;
+}
+.auth-tabs button.active {
+	background: var(--panel);
+	color: var(--foreground);
+	box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+.auth-form {
+	display: grid;
+	gap: 16px;
+}
+.auth-form label {
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+	font-weight: 600;
+}
+.auth-form input {
+	width: 100%;
+	padding: 10px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel-strong);
+	color: var(--foreground);
+	font: inherit;
+	font-size: 16px;
+	font-weight: 400;
+}
+.auth-form input:focus-visible {
+	border-color: var(--accent);
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+.auth-form input::placeholder {
+	color: var(--muted);
+	opacity: 0.7;
+}
+.auth-form small {
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 400;
+}
+.auth-submit {
+	min-height: 42px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 10px 16px;
+	border: 0;
+	border-radius: 9px;
+	background: #1d4ed8;
+	color: white;
+	font-size: 14px;
+	font-weight: 600;
+}
+.auth-submit:hover:not(:disabled) {
+	background: #1e40af;
+}
+.auth-form input:disabled,
+.auth-submit:disabled {
+	opacity: 0.6;
+	cursor: wait;
+}
+.signin-error {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--danger) 25%, var(--line));
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--danger) 6%, var(--panel));
+	color: var(--danger);
+	font-size: 13px;
+}
+.signin-notice {
+	font-size: 13px;
+	margin: 0;
+	color: var(--success);
+}
+.signin-spin {
+	animation: auth-spin 1s linear infinite;
+}
+.account-menu {
+	display: grid;
+	gap: 10px;
+	padding-bottom: 14px;
+	margin-bottom: 10px;
+	border-bottom: 1px solid var(--nav-border);
+}
+.account-identity {
+	display: grid;
+	min-width: 0;
+	font-size: 13px;
+}
+.account-identity strong,
+.account-identity span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.account-identity span {
+	font-size: 12px;
+	color: var(--nav-muted);
+}
+.account-signout {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 0;
+	border: 0;
+	background: none;
+	color: var(--nav-muted);
+	font-size: 13px;
+}
+.account-menu small {
+	color: var(--danger);
+}
+@keyframes auth-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.signin-spin {
+		animation: none;
+	}
+}
+@media (max-width: 480px) {
+	.signin-page {
+		padding: 16px;
+	}
+	.signin-card {
+		padding: 28px 22px;
+		gap: 20px;
+	}
 }
