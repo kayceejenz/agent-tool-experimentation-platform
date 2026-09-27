@@ -55,6 +55,7 @@ export function AppShell({
 						) : (
 							<Menu size={21} />
 						)}
+						<span>Menu</span>
 					</button>
 				</div>
 				<div
@@ -65,10 +66,10 @@ export function AppShell({
 							if (open) close();
 						}}
 					/>
-					<div className='rail-footer'>
-						<AccountMenu user={user} />
-						<ThemeToggle />
-					</div>
+				</div>
+				<div className='rail-footer'>
+					<ThemeToggle />
+					<AccountMenu user={user} />
 				</div>
 			</aside>
 			<main

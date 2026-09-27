@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     registration_rate_window_seconds: int = Field(default=3600, ge=60, le=86400)
     login_rate_limit: int = Field(default=10, ge=1, le=1000)
     login_rate_window_seconds: int = Field(default=900, ge=60, le=86400)
+    auth_proxy_secret: SecretStr | None = Field(default=None, min_length=32)
     refresh_cookie_name: str = "agent_refresh_token"
 
     @field_validator("auth_origins")

@@ -9,7 +9,12 @@ import {
 } from 'react';
 import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
-import { ensureLogin, withAuthLock } from '@/lib/auth/client';
+import {
+	authFetch,
+	ensureLogin,
+	notifyAuthChange,
+	withAuthLock,
+} from '@/lib/auth/client';
 import { safeCallback } from '@/lib/auth/shared';
 
 function SignInContent() {
@@ -63,7 +68,7 @@ function SignInContent() {
 		try {
 			await withAuthLock(async () => {
 				if (mode === 'register') {
-					const response = await fetch(
+					const response = await authFetch(
 						'/api/auth/register',
 						{
 							method: 'POST',
@@ -93,7 +98,7 @@ function SignInContent() {
 						'Account created. You can now sign in.',
 					);
 				}
-				const response = await fetch(
+				const response = await authFetch(
 					'/api/auth/login',
 					{
 						method: 'POST',
@@ -114,6 +119,7 @@ function SignInContent() {
 							'Unable to sign in.',
 					);
 			});
+			notifyAuthChange();
 			window.location.replace(callback);
 		} catch (cause) {
 			setError(
@@ -273,9 +279,18 @@ function SignInContent() {
 							/>
 						</label>
 						<label>
-							<span>Password</span>
+							<span id='password-label'>
+								Password
+							</span>
 							<input
 								type='password'
+								aria-labelledby='password-label'
+								aria-describedby={
+									mode ===
+									'register'
+										? 'password-hint'
+										: undefined
+								}
 								autoComplete={
 									mode ===
 									'signin'
@@ -303,7 +318,7 @@ function SignInContent() {
 							/>
 							{mode ===
 								'register' && (
-								<small>
+								<small id='password-hint'>
 									At least
 									12
 									characters.

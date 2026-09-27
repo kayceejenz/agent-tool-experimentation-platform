@@ -15,12 +15,13 @@ export function ThemeToggle({ disabled = false }: { disabled?: boolean }) {
 	return (
 		<button
 			className='theme-toggle'
+			type='button'
+			title='Toggle color theme'
 			disabled={disabled}
 			onClick={toggle}
 			aria-label='Toggle color theme'>
 			<Sun className='sun' size={18} aria-hidden />
 			<Moon className='moon' size={18} aria-hidden />
-			<span>Switch theme</span>
 		</button>
 	);
 }

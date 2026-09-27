@@ -4,6 +4,7 @@ import {
 	authFailure,
 	backend,
 	checkOrigin,
+	clientAddressHeaders,
 	clearTokens,
 	currentUser,
 	json,
@@ -77,7 +78,10 @@ export async function POST(request: Request, context: Context) {
 
 			const result = await backend(action, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: {
+					'Content-Type': 'application/json',
+					...clientAddressHeaders(request),
+				},
 				body: JSON.stringify(body),
 			});
 
@@ -125,7 +129,7 @@ export async function POST(request: Request, context: Context) {
 			}),
 		);
 
-		const response = json({ user: await readUser(tokens.access) });
+		const response = json({ ok: true });
 		setTokens(response, tokens);
 
 		return response;

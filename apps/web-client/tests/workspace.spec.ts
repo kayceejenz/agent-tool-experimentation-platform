@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './fixtures';
 
 test('empty workspace has no sample data or project-scoped links', async ({
 	page,
@@ -10,6 +11,10 @@ test('empty workspace has no sample data or project-scoped links', async ({
 	await expect(
 		page.getByRole('heading', { name: 'No projects yet' }),
 	).toBeVisible();
+	await page.screenshot({
+		path: 'test-results/workspace-desktop.png',
+		fullPage: true,
+	});
 	await expect(page.getByLabel('Switch project')).toHaveCount(0);
 	await expect(page.locator('a[href^="/projects/"]')).toHaveCount(0);
 	await expect(
@@ -50,6 +55,7 @@ test('every sidebar destination renders a real page', async ({ page }) => {
 		.evaluateAll(links =>
 			links.map(link => link.getAttribute('href')!),
 		);
+	expect(hrefs.length).toBeGreaterThan(0);
 	for (const href of hrefs) {
 		const response = await page.goto(href);
 		expect(response?.status()).toBe(200);
@@ -101,6 +107,16 @@ test('mobile menu supports keyboard dismissal and closes after navigation withou
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
+	await expect(
+		page.getByRole('button', { name: 'Toggle color theme' }),
+	).toBeVisible();
+	await expect(
+		page.getByRole('button', { name: 'Sign out', exact: true }),
+	).toBeVisible();
+	await page.screenshot({
+		path: 'test-results/workspace-mobile.png',
+		fullPage: true,
+	});
 	const menu = page.getByRole('button', {
 		name: 'Open workspace navigation',
 	});

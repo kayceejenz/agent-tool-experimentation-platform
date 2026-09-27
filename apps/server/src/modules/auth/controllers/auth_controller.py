@@ -1,4 +1,5 @@
 from ipaddress import ip_address
+from secrets import compare_digest
 from typing import Annotated
 
 from api.dependencies import auth_rate_limiter, auth_service, current_user, settings
@@ -41,6 +42,20 @@ async def enforce_auth_rate_limit(
     action: str,
 ) -> None:
     client_identifier = request.client.host if request.client else "unknown"
+    proxy_secret = request.headers.get("x-agent-proxy-secret")
+    forwarded = request.headers.get("x-agent-client-ip")
+    if proxy_secret is not None or forwarded is not None:
+        configured = settings(request).auth_proxy_secret
+        if (
+            not configured
+            or not proxy_secret
+            or not compare_digest(proxy_secret, configured.get_secret_value())
+        ):
+            raise HTTPException(403, "Untrusted authentication proxy")
+        try:
+            client_identifier = str(ip_address(forwarded or ""))
+        except ValueError:
+            raise HTTPException(400, "Invalid client address") from None
     try:
         await limiter.check(action, client_identifier)
     except AuthRateLimitExceededError as error:
@@ -114,7 +129,7 @@ async def login(
         )
     except InvalidCredentialsError:
         raise HTTPException(401, "Invalid email or password") from None
-    
+
     set_refresh_cookie(request, response, pair)
     return token_response(pair)
 
