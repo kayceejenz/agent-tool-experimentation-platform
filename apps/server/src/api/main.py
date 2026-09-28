@@ -17,6 +17,9 @@ from modules.auth.repos.refresh_token_repo import RefreshTokenRepository
 from modules.auth.repos.user_repo import UserRepository
 from modules.auth.services.auth_service import AuthenticationService
 from modules.auth.services.rate_limit_service import AuthRateLimiter
+from modules.projects.controllers.project_controller import router as project_router
+from modules.projects.repos.project_repo import ProjectRepository
+from modules.projects.services.project_service import ProjectService
 from psycopg import Error as DatabaseError
 from psycopg_pool import PoolClosed, PoolTimeout, TooManyRequests
 from pydantic import BaseModel
@@ -59,9 +62,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 RefreshTokenRepository(users),
                 users,
                 config.refresh_token_days,
-                config.registration_invitation_code.get_secret_value()
-                if config.registration_invitation_code is not None
-                else None,
+                (
+                    config.registration_invitation_code.get_secret_value()
+                    if config.registration_invitation_code is not None
+                    else None
+                ),
                 dummy_hash,
             )
             instance.state.auth_rate_limiter = AuthRateLimiter(
@@ -73,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 config.login_rate_window_seconds,
             )
         instance.state.database = database
+        instance.state.projects = ProjectService(ProjectRepository(database))
         try:
             await database.open()
             yield
@@ -84,11 +90,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     instance.include_router(auth_router, prefix="/api/v1")
+    instance.include_router(project_router, prefix="/api/v1")
 
     @instance.middleware("http")
     async def auth_cache_control(request: Request, call_next):
         response = await call_next(request)
-        if request.url.path.startswith("/api/v1/auth/"):
+        if request.url.path.startswith(("/api/v1/auth/", "/api/v1/projects")):
             response.headers["Cache-Control"] = "no-store"
         return response
 
