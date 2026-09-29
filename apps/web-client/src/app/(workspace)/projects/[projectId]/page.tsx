@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { findProject } from '@/lib/workspace';
+import { getProject } from '@/lib/projects/server';
 import { ProjectOverview } from '@/components/workspace/workspace-views';
 
 export default async function Page({
@@ -9,7 +9,7 @@ export default async function Page({
 }) {
 	const { projectId } = await params;
 
-	const project = findProject(projectId);
+	const project = await getProject(projectId);
 	if (!project) notFound();
 
 	return <ProjectOverview project={project} />;

@@ -15,7 +15,7 @@ import {
 	Wrench,
 	Workflow,
 } from 'lucide-react';
-import { projects } from '@/lib/workspace';
+import { useProjects } from '@/components/projects/project-provider';
 
 const groups = [
 	{
@@ -60,10 +60,14 @@ export function WorkspaceNavigation({
 	onNavigate?: () => void;
 }) {
 	const pathname = usePathname();
+	const { projects, selectedProject, loading, error, more } = useProjects();
 	const router = useRouter();
 	const pathParts = pathname.split('/');
 	const project =
-		projects.find(item => item.id === pathParts[2]) ?? projects[0];
+		pathParts[2] && pathParts[2] !== 'new'
+			? (selectedProject?.id === pathParts[2] ? selectedProject : projects.find(item => item.id === pathParts[2]))
+			: projects[0];
+	const choices = project && !projects.some(item => item.id === project.id) ? [project, ...projects] : projects;
 	const base = project ? `/projects/${project.id}` : undefined;
 
 	function navLink(
@@ -149,7 +153,7 @@ export function WorkspaceNavigation({
 								);
 								onNavigate?.();
 							}}>
-							{projects.map(item => (
+							{choices.map(item => (
 								<option
 									key={
 										item.id
@@ -167,10 +171,10 @@ export function WorkspaceNavigation({
 				</div>
 			) : (
 				<p className='nav-guidance'>
-					Select a project to access its tools and
-					settings.
+					{loading ? 'Loading projects…' : error ? 'Projects are unavailable. Open Projects to retry.' : 'Select a project to access its tools and settings.'}
 				</p>
 			)}
+			{more && <Link href='/projects' onClick={onNavigate}>Browse all projects</Link>}
 			{groups.map(group => (
 				<div className='nav-group' key={group.label}>
 					<span className='nav-group-label'>

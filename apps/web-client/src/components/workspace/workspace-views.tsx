@@ -1,13 +1,15 @@
+import { ProjectRows } from '@/components/projects/project-list';
+import { ProjectForm } from '@/components/projects/project-form';
+import { ProjectSync } from '@/components/projects/project-provider';
 import Link from 'next/link';
 import {
 	ArrowRight,
-	ArrowUpRight,
 	FlaskConical,
 	FolderKanban,
 	Server,
 	Workflow,
 } from 'lucide-react';
-import { projects, sections } from '@/lib/workspace';
+import { sections } from '@/lib/workspace';
 import type { Project, Section } from '@/types/workspace';
 
 export function PageHeader({
@@ -30,50 +32,14 @@ export function PageHeader({
 	);
 }
 
-function ProjectRows() {
-	if (!projects.length)
-		return (
-			<div className='empty-state'>
-				<span className='empty-icon'>
-					<FolderKanban size={28} aria-hidden />
-				</span>
-				<h2>No projects yet</h2>
-				<p>
-					Your projects will appear here once
-					project creation is available.
-				</p>
-			</div>
-		);
-	return (
-		<div className='project-list'>
-			{projects.map(project => (
-				<Link
-					href={`/projects/${project.id}`}
-					key={project.id}>
-					<span className='project-icon'>
-						<FolderKanban
-							size={21}
-							aria-hidden
-						/>
-					</span>
-					<div>
-						<strong>{project.name}</strong>
-						<p>{project.description}</p>
-					</div>
-					<ArrowUpRight size={18} aria-hidden />
-				</Link>
-			))}
-		</div>
-	);
-}
-
 export function ProjectList() {
 	return (
 		<>
 			<PageHeader
 				title='Projects'
-				description='Keep connections, agents, and experiments together.'
-			/>
+				description='Keep connections, agents, and experiments together.'>
+<Link className='button primary' href='/projects/new'>Create project</Link>
+</PageHeader>
 			<section className='panel'>
 				<ProjectRows />
 			</section>
@@ -193,7 +159,8 @@ export function ProjectOverview({ project }: { project: Project }) {
 		<>
 			<PageHeader
 				title={project.name}
-				description={project.description}></PageHeader>
+				description={project.description ?? 'No description'}></PageHeader>
+			<ProjectSync project={project} />
 			<ProjectTabs project={project} />
 			<section className='panel empty-state'>
 				<span className='empty-icon'>
@@ -201,8 +168,7 @@ export function ProjectOverview({ project }: { project: Project }) {
 				</span>
 				<h2>Start with a connection</h2>
 				<p>
-					MCP connections and tool discovery will
-					be available in a later milestone.
+					MCP connections and tool discovery are coming soon.
 				</p>
 				<Link
 					className='button primary'
@@ -235,58 +201,18 @@ export function SectionView({
 						project={project}
 						settings
 					/>
-					<section className='panel'>
-						<div className='panel-heading'>
-							<h2>Project details</h2>
-							<span className='badge'>
-								Read-only
-								preview
-							</span>
-						</div>
-						<dl className='details-list'>
-							<div>
-								<dt>Name</dt>
-								<dd>
-									{
-										project.name
-									}
-								</dd>
-							</div>
-							<div>
-								<dt>
-									Description
-								</dt>
-								<dd>
-									{
-										project.description
-									}
-								</dd>
-							</div>
-							<div>
-								<dt>Access</dt>
-								<dd>
-									Project
-									membership
-									will be
-									available
-									with
-									authentication.
-								</dd>
-							</div>
-						</dl>
-					</section>
+					<ProjectSync project={project} />
+					<section className='panel'><ProjectForm key={project.id} project={project} /></section>
 				</>
 			) : (
 				<section className='panel empty-state'>
+<ProjectSync project={project} />
 					<span className='empty-icon'>
 						<FolderKanban size={28} />
 					</span>
 					<h2>{details.empty}</h2>
 					<p>
-						This is a layout preview.{' '}
-						{details.title} will become
-						available when this feature is
-						implemented.
+						{details.title} is not available yet.
 					</p>
 					<Link
 						className='button'

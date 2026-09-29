@@ -1,7 +1,5 @@
-import type { Project, Section } from '@/types/workspace';
+import type { Section } from '@/types/workspace';
 
-// Project data will come from the API when persistence is implemented.
-export const projects: Project[] = [];
 export const sections: Record<
 	Section,
 	{ title: string; description: string; empty: string }
@@ -58,9 +56,6 @@ export const sections: Record<
 		empty: '',
 	},
 };
-export function findProject(id: string) {
-	return projects.find(project => project.id === id);
-}
 export function isSection(value: string): value is Section {
 	return Object.hasOwn(sections, value);
 }

@@ -7,6 +7,7 @@ import '@fontsource/outfit/700.css';
 import { themeScript } from '@/lib/theme';
 import './globals.css';
 import './auth.css';
+import './projects.css';
 
 export const metadata: Metadata = {
 	title: 'Agent Tool Experiment Platform',

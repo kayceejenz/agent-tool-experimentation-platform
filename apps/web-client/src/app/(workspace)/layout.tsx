@@ -1,3 +1,4 @@
+import { ProjectProvider } from '@/components/projects/project-provider';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -28,5 +29,5 @@ export default async function WorkspaceLayout({
 			`${hasRefresh ? '/auth/refresh' : '/auth/signin'}?callbackUrl=${encodeURIComponent(callback)}&error=SessionExpired`,
 		);
 	}
-	return <AppShell user={user}>{children}</AppShell>;
+	return <ProjectProvider key={user.id}><AppShell user={user}>{children}</AppShell></ProjectProvider>;
 }

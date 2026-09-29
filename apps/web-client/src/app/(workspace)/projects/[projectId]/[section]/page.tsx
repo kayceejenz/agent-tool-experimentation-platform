@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import { findProject, isSection } from '@/lib/workspace';
+import { isSection } from '@/lib/workspace';
+import { getProject } from '@/lib/projects/server';
 import { SectionView } from '@/components/workspace/workspace-views';
 
 export default async function Page({
@@ -9,7 +10,7 @@ export default async function Page({
 }) {
 	const { projectId, section } = await params;
 
-	const project = findProject(projectId);
+	const project = await getProject(projectId, section);
 
 	if (!project || !isSection(section)) notFound();
 
