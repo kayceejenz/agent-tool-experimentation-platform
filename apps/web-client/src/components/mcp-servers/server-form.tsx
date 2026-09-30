@@ -2,9 +2,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { projectRequest, ProjectRequestError } from '@/lib/projects/client';
+import { checkErrors } from './check-errors';
 import type { McpServer } from '@/types/mcp-server';
 
 type Props = {
+	inline?: boolean;
+	onBusyChange?: (busy: boolean) => void;
 	projectId: string;
 	server: McpServer | null;
 	onClose: () => void;
@@ -13,6 +16,8 @@ type Props = {
 };
 export function ServerForm({
 	projectId,
+	inline = false,
+	onBusyChange,
 	server,
 	onClose,
 	onSaved,
@@ -27,7 +32,10 @@ export function ServerForm({
 	);
 	const [credential, setCredential] = useState('');
 	const [busy, setBusy] = useState(false);
+	const [checking, setChecking] = useState(false);
+	const [verified, setVerified] = useState(false);
 	const [error, setError] = useState('');
+	const [notice, setNotice] = useState('');
 	const [denied, setDenied] = useState(false);
 	const needsCredential =
 		auth === 'bearer' &&
@@ -36,18 +44,18 @@ export function ServerForm({
 			endpoint.trim() !== server.endpoint);
 	useEffect(() => {
 		const element = dialog.current;
-		element?.showModal();
+		if (!inline) element?.showModal();
 		nameInput.current?.focus();
 		return () => element?.close();
-	}, []);
+	}, [inline]);
 
-	async function submit(event: FormEvent<HTMLFormElement>) {
-		event.preventDefault();
-		if (busy || denied) return;
-		if (!name.trim()) {
-			setError('Enter a server name.');
-			return;
-		}
+	function resetVerification() {
+		setVerified(false);
+		setNotice('');
+	}
+
+	function validate(): string | null {
+		if (!name.trim()) return 'Enter a server name.';
 		try {
 			const url = new URL(endpoint.trim());
 			if (
@@ -59,17 +67,88 @@ export function ServerForm({
 			)
 				throw new Error();
 		} catch {
-			setError(
-				'Enter an HTTP or HTTPS endpoint without credentials, query parameters, or fragments.',
-			);
-			return;
+			return 'Enter an HTTP or HTTPS endpoint without credentials, query parameters, or fragments.';
 		}
-		if (needsCredential && !credential) {
-			setError('Enter a bearer token for this endpoint.');
-			return;
+		if (needsCredential && !credential)
+			return 'Enter a bearer token for this endpoint.';
+		return null;
+	}
+
+	async function testConnection(): Promise<boolean> {
+		if (checking) return false;
+		const invalid = validate();
+		if (invalid) {
+			setError(invalid);
+			setVerified(false);
+			setNotice('');
+			return false;
 		}
-		setBusy(true);
+		setChecking(true);
 		setError('');
+		setNotice('');
+		setVerified(false);
+		try {
+			const result = await projectRequest<{
+				reachable: boolean;
+				error_code: string | null;
+			}>(`/${projectId}/mcp-servers/probe`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					endpoint: endpoint.trim(),
+					auth_type: auth,
+					...(auth === 'bearer' && credential
+						? { credential }
+						: {}),
+				}),
+			});
+			if (!result.reachable) {
+				setError(
+					checkErrors[result.error_code ?? ''] ??
+						'Unable to reach this MCP server. Verify the endpoint and try again.',
+				);
+				return false;
+			}
+			setVerified(true);
+			setNotice(
+				'Connection verified. Save to add this MCP server.',
+			);
+			return true;
+		} catch (error) {
+			setError(
+				error instanceof Error
+					? error.message
+					: 'Unable to verify this connection.',
+			);
+			if (
+				error instanceof ProjectRequestError &&
+				[403, 404].includes(error.status)
+			) {
+				setCredential('');
+				setDenied(true);
+				onDenied();
+			}
+			return false;
+		} finally {
+			setChecking(false);
+		}
+	}
+
+	async function submit(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		if (busy || denied) return;
+		const invalid = validate();
+		if (invalid) {
+			setError(invalid);
+			return;
+		}
+		if (!(await testConnection())) return;
+		setBusy(true);
+		onBusyChange?.(true);
+		setError('');
+		setNotice('');
 		try {
 			const result = await projectRequest<McpServer>(
 				`/${projectId}/mcp-servers${server ? `/${server.id}` : ''}`,
@@ -108,18 +187,12 @@ export function ServerForm({
 			}
 		} finally {
 			setBusy(false);
+			onBusyChange?.(false);
 		}
 	}
 
-	return (
-		<dialog
-			ref={dialog}
-			className='mcp-dialog'
-			aria-labelledby='mcp-form-title'
-			onCancel={event => {
-				event.preventDefault();
-				if (!busy) onClose();
-			}}>
+	const content = (
+		<>
 			<div className='mcp-dialog-heading'>
 				<h2 id='mcp-form-title'>
 					{server
@@ -268,6 +341,19 @@ export function ServerForm({
 					</button>
 				</div>
 			</form>
+		</>
+	);
+	if (inline) return <div className='mcp-inline-form'>{content}</div>;
+	return (
+		<dialog
+			ref={dialog}
+			className='mcp-dialog'
+			aria-labelledby='mcp-form-title'
+			onCancel={event => {
+				event.preventDefault();
+				if (!busy) onClose();
+			}}>
+			{content}
 		</dialog>
 	);
 }

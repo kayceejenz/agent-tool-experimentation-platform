@@ -3,13 +3,7 @@ import { ProjectRows } from '@/components/projects/project-list';
 import { ProjectForm } from '@/components/projects/project-form';
 import { ProjectSync } from '@/components/projects/project-provider';
 import Link from 'next/link';
-import {
-	ArrowRight,
-	FlaskConical,
-	FolderKanban,
-	Server,
-	Workflow,
-} from 'lucide-react';
+import { ArrowRight, Workflow } from 'lucide-react';
 import { sections } from '@/lib/workspace';
 import type { Project, Section } from '@/types/workspace';
 
@@ -90,42 +84,37 @@ export function Overview() {
 				<h2>Your workflow</h2>
 				<span>Build one step at a time</span>
 			</div>
-			<div className='workflow-grid'>
+			<ol className='workflow-steps'>
 				{[
 					{
 						title: 'Connect tools',
 						description:
 							'Discover what your systems can do.',
-						Icon: Server,
 					},
 					{
 						title: 'Configure agents',
 						description:
 							'Choose instructions, models, and tools.',
-						Icon: Workflow,
 					},
 					{
 						title: 'Run experiments',
 						description:
 							'Compare behavior against a benchmark.',
-						Icon: FlaskConical,
 					},
-				].map(({ title, description, Icon }, i) => (
-					<div
-						className='workflow-card'
+				].map(({ title, description }, i) => (
+					<li
+						className='workflow-step'
 						key={title}>
-						<div className='card-top'>
-							<Icon
-								size={22}
-								aria-hidden
-							/>
-							<span>0{i + 1}</span>
+						<span className='workflow-step-number'>
+							{i + 1}
+						</span>
+						<div>
+							<h3>{title}</h3>
+							<p>{description}</p>
 						</div>
-						<h3>{title}</h3>
-						<p>{description}</p>
-					</div>
+					</li>
 				))}
-			</div>
+			</ol>
 			<section className='panel overview-projects'>
 				<div className='panel-heading'>
 					<h2>Projects</h2>
@@ -170,9 +159,6 @@ export function ProjectOverview({ project }: { project: Project }) {
 			<ProjectSync project={project} />
 			<ProjectTabs project={project} />
 			<section className='panel empty-state'>
-				<span className='empty-icon'>
-					<Server size={28} />
-				</span>
 				<h2>Start with a connection</h2>
 				<p>
 					Add an MCP server to configure the tools
@@ -222,9 +208,6 @@ export function SectionView({
 			) : (
 				<section className='panel empty-state'>
 					<ProjectSync project={project} />
-					<span className='empty-icon'>
-						<FolderKanban size={28} />
-					</span>
 					<h2>{details.empty}</h2>
 					<p>
 						{details.title} is not available

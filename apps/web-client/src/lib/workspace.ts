@@ -9,12 +9,6 @@ export const sections: Record<
 		description: 'Connect the systems your agents can work with.',
 		empty: 'No servers connected',
 	},
-	tools: {
-		title: 'Tools',
-		description:
-			'Inspect and control the tools available to this project.',
-		empty: 'No tools discovered',
-	},
 	experiments: {
 		title: 'Experiments',
 		description:

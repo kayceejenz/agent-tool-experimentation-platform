@@ -4,7 +4,6 @@ export type Project = {
 };
 export type Section =
 	| 'servers'
-	| 'tools'
 	| 'experiments'
 	| 'benchmarks'
 	| 'prompts'

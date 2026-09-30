@@ -1,14 +1,66 @@
-.project-form { display: grid; gap: 12px; padding: 28px; max-width: 760px; }
-.project-form label { font-size: 14px; font-weight: 600; }
-.project-form input, .project-form textarea { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--background); color: var(--foreground); font: inherit; }
-.project-form textarea { resize: vertical; }
-.project-form input:disabled, .project-form textarea:disabled { opacity: .7; }
-.project-form small, .project-optional { color: var(--muted); font-weight: 400; }
-.project-form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
-.project-feedback { padding: 20px; }
-.project-error { color: var(--danger); }
-.project-role { text-transform: capitalize; font-size: 12px; color: var(--muted); }
-.project-list strong, .project-list p { overflow-wrap: anywhere; }
-.project-list a > div { min-width: 0; }
-.button:disabled { opacity: .6; cursor: wait; }
-@media (max-width: 760px) { .project-form { padding: 18px; } }
+.project-form {
+	display: grid;
+	gap: var(--space-6);
+	padding: var(--space-11);
+	max-width: 760px;
+}
+.project-form label {
+	font-size: 14px;
+	font-weight: 600;
+}
+.project-form input,
+.project-form textarea {
+	width: 100%;
+	min-width: 0;
+	padding: var(--space-5) var(--space-6);
+	border: 1px solid var(--control-line);
+	border-radius: 8px;
+	background: var(--background);
+	color: var(--foreground);
+	font: inherit;
+}
+.project-form textarea {
+	resize: vertical;
+}
+.project-form input:disabled,
+.project-form textarea:disabled {
+	opacity: 0.7;
+}
+.project-form small,
+.project-optional {
+	color: var(--muted);
+	font-weight: 400;
+}
+.project-form-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-6);
+	margin-top: var(--space-6);
+}
+.project-feedback {
+	padding: var(--space-9);
+}
+.project-error {
+	color: var(--danger);
+}
+.project-role {
+	text-transform: capitalize;
+	font-size: 12px;
+	color: var(--muted);
+}
+.project-list strong,
+.project-list p {
+	overflow-wrap: anywhere;
+}
+.project-list a > div {
+	min-width: 0;
+}
+.button:disabled {
+	opacity: 0.6;
+	cursor: wait;
+}
+@media (max-width: 760px) {
+	.project-form {
+		padding: var(--space-8);
+	}
+}

@@ -17,15 +17,14 @@ async function add(
 	page: import('@playwright/test').Page,
 	name: string,
 	token = '',
+	endpoint = 'http://localhost:8012/mcp',
 ) {
 	await page
 		.getByRole('button', { name: 'Add server', exact: true })
 		.click();
 	const dialog = page.getByRole('dialog');
 	await dialog.getByLabel('Server name', { exact: true }).fill(name);
-	await dialog
-		.getByLabel('Endpoint URL')
-		.fill('http://localhost:8012/mcp');
+	await dialog.getByLabel('Endpoint URL').fill(endpoint);
 	if (token) {
 		await dialog
 			.getByLabel('Authentication', { exact: true })
@@ -50,12 +49,12 @@ test('manage a real connection without exposing stored tokens', async ({
 		page.getByRole('heading', { name: 'No MCP servers yet' }),
 	).toBeVisible();
 	await add(page, 'Demo MCP', 'test-only-private-token');
-	const row = page.getByRole('article', {
+	const row = page.getByRole('row', {
 		name: 'Demo MCP',
 		exact: true,
 	});
 	await expect(row).toContainText('Not checked');
-	await expect(row).toContainText('Bearer token · Configured');
+	await expect(row).toContainText('Configured');
 	await expect(row.getByRole('switch')).toHaveAttribute(
 		'aria-checked',
 		'false',
@@ -65,17 +64,26 @@ test('manage a real connection without exposing stored tokens', async ({
 		'aria-checked',
 		'true',
 	);
-	await row.getByRole('button', { name: 'Edit', exact: true }).click();
-	const dialog = page.getByRole('dialog');
-	await expect(dialog.getByLabel('Replacement bearer token')).toHaveValue(
+	await row.getByRole('button', { name: 'Manage Demo MCP' }).click();
+	const panel = page.locator('dialog.mcp-sheet');
+	await expect(
+		panel.getByRole('heading', { name: 'Overview' }),
+	).toBeVisible();
+	await panel.getByRole('button', { name: 'Edit connection' }).click();
+	await expect(panel.getByLabel('Replacement bearer token')).toHaveValue(
 		'',
 	);
-	await dialog
+	await panel
 		.getByLabel('Server name', { exact: true })
 		.fill('Renamed MCP');
-	await dialog.getByRole('button', { name: 'Save connection' }).click();
-	await expect(dialog).not.toBeVisible();
-	const renamed = page.getByRole('article', {
+	await panel.getByRole('button', { name: 'Save connection' }).click();
+	await expect(
+		panel.getByRole('heading', { name: 'Renamed MCP' }),
+	).toBeVisible();
+	await expect(panel.getByRole('status')).toContainText(
+		'Connection saved.',
+	);
+	const renamed = page.getByRole('row', {
 		name: 'Renamed MCP',
 		exact: true,
 	});
@@ -83,24 +91,29 @@ test('manage a real connection without exposing stored tokens', async ({
 		'aria-checked',
 		'true',
 	);
-	await renamed
-		.getByRole('button', { name: 'Edit', exact: true })
-		.click();
-	await dialog
+	await panel.getByRole('button', { name: 'Edit connection' }).click();
+	await panel
 		.getByLabel('Endpoint URL')
 		.fill('http://localhost:8012/updated');
 	await expect(
-		dialog.getByLabel('Replacement bearer token'),
+		panel.getByLabel('Replacement bearer token'),
 	).toHaveAttribute('required', '');
-	await dialog
+	await panel
 		.getByLabel('Replacement bearer token')
 		.fill('test-only-replacement');
-	await dialog.getByRole('button', { name: 'Save connection' }).click();
-	await expect(dialog).not.toBeVisible();
+	await panel.getByRole('button', { name: 'Save connection' }).click();
+	await expect(panel.getByRole('status')).toContainText(
+		'Connection saved.',
+	);
 	await expect(renamed.getByRole('switch')).toHaveAttribute(
 		'aria-checked',
 		'false',
 	);
+	await page.screenshot({
+		path: 'test-results/mcp-manage-panel.png',
+	});
+	await page.keyboard.press('Escape');
+	await expect(panel).not.toBeVisible();
 	await page.reload();
 	await expect(renamed).toContainText('http://localhost:8012/updated');
 	const response = await context.request.get(
@@ -115,14 +128,18 @@ test('manage a real connection without exposing stored tokens', async ({
 		fullPage: true,
 	});
 	await renamed
-		.getByRole('button', { name: 'Edit', exact: true })
+		.getByRole('button', { name: 'Manage Renamed MCP' })
 		.click();
-	await dialog
+	const reopened = panel;
+	await reopened.getByRole('button', { name: 'Edit connection' }).click();
+	await reopened
 		.getByLabel('Authentication', { exact: true })
 		.selectOption('none');
-	await expect(dialog).toContainText('remove the stored token');
-	await dialog.getByRole('button', { name: 'Save connection' }).click();
-	await expect(dialog).not.toBeVisible();
+	await expect(reopened).toContainText('remove the stored token');
+	await reopened.getByRole('button', { name: 'Save connection' }).click();
+	await expect(reopened.getByRole('status')).toContainText(
+		'Connection saved.',
+	);
 	await expect(renamed).toContainText('None');
 });
 
@@ -186,9 +203,21 @@ test('forms support mobile, keyboard dismissal, failure recovery, and denied wri
 		.click();
 	await expect(dialog).not.toBeVisible();
 	await page
-		.getByRole('article', { name: 'Retained name' })
-		.getByRole('button', { name: 'Edit', exact: true })
+		.getByRole('row', { name: 'Retained name' })
+		.getByRole('button', { name: 'Manage Retained name' })
 		.click();
+	const panel = page.locator('dialog.mcp-sheet');
+	await expect(
+		panel.getByRole('heading', { name: 'Retained name' }),
+	).toBeVisible();
+	expect(
+		await page.evaluate(
+			() =>
+				document.documentElement.scrollWidth <=
+				innerWidth,
+		),
+	).toBe(true);
+	await panel.getByRole('button', { name: 'Edit connection' }).click();
 	await page.route(`**/api/projects/${data.id}/mcp-servers/*`, route =>
 		route.fulfill({
 			status: 403,
@@ -197,14 +226,20 @@ test('forms support mobile, keyboard dismissal, failure recovery, and denied wri
 			},
 		}),
 	);
-	await dialog.getByRole('button', { name: 'Save connection' }).click();
-	await expect(dialog.getByRole('alert')).toContainText(
+	await panel.getByRole('button', { name: 'Save connection' }).click();
+	await expect(panel.getByRole('alert')).toContainText(
 		'no longer have permission',
 	);
 	await expect(
-		dialog.getByRole('button', { name: 'Save connection' }),
+		panel.getByRole('button', { name: 'Save connection' }),
 	).toBeDisabled();
-	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await panel.getByRole('button', { name: 'Cancel' }).click();
+	await expect(panel).toContainText('read-only access');
+	await expect(
+		panel.getByRole('button', { name: 'Edit connection' }),
+	).toHaveCount(0);
+	await page.keyboard.press('Escape');
+	await expect(panel).not.toBeVisible();
 	await expect(addButton).toHaveCount(0);
 });
 
@@ -237,9 +272,9 @@ test('list failures can retry and pagination remains scoped to the selected proj
 	);
 	await page.unroute(`**${base}*`);
 	await page.getByRole('button', { name: 'Try again' }).click();
-	await expect(page.getByRole('article')).toHaveCount(20);
+	await expect(page.locator('.mcp-table tbody tr')).toHaveCount(20);
 	await page.getByRole('button', { name: 'Load more servers' }).click();
-	await expect(page.getByRole('article')).toHaveCount(21);
+	await expect(page.locator('.mcp-table tbody tr')).toHaveCount(21);
 	await page.getByLabel('Switch project').selectOption(second.id);
 	await expect(page).toHaveURL(
 		new RegExp(`/projects/${second.id}/servers$`),
@@ -247,7 +282,7 @@ test('list failures can retry and pagination remains scoped to the selected proj
 	await expect(
 		page.getByRole('heading', { name: 'No MCP servers yet' }),
 	).toBeVisible();
-	await expect(page.getByRole('article')).toHaveCount(0);
+	await expect(page.locator('.mcp-table tbody tr')).toHaveCount(0);
 });
 
 test('connection routes reject forged origins and cross-project IDs', async ({
@@ -289,6 +324,73 @@ test('connection routes reject forged origins and cross-project IDs', async ({
 				headers: { Origin: 'https://foreign.example' },
 				data: { enabled: true },
 			})
+		).status(),
+	).toBe(403);
+});
+
+test('check a live MCP connection and discover tool schemas', async ({
+	page,
+	context,
+}) => {
+	const data = await project(context.request);
+	await page.goto(`/projects/${data.id}/servers`);
+	await add(page, 'Retail analysis', '', 'http://127.0.0.1:8013/mcp');
+	const row = page.getByRole('row', {
+		name: 'Retail analysis',
+		exact: true,
+	});
+	await row
+		.getByRole('button', { name: 'Manage Retail analysis' })
+		.click();
+	const panel = page.locator('dialog.mcp-sheet');
+	await expect(
+		panel.getByRole('heading', { name: 'Retail analysis' }),
+	).toBeVisible();
+	await panel.getByRole('button', { name: 'Check connection' }).click();
+	await expect(panel.getByRole('status')).toContainText(
+		'responded successfully',
+	);
+	await expect(row.getByText('Connected', { exact: true })).toBeVisible();
+	await expect(row.getByRole('switch')).toHaveAttribute(
+		'aria-checked',
+		'false',
+	);
+	await panel.getByRole('button', { name: 'Discover' }).click();
+	await expect(
+		panel.getByRole('heading', { name: /^Tools/ }),
+	).toBeVisible();
+	await expect(panel.getByRole('status')).toContainText(
+		'tools discovered',
+	);
+	await panel.locator('summary', { hasText: 'inspect_dataset' }).click();
+	await expect(panel.locator('details[open] pre')).toContainText(
+		'dataset_id',
+	);
+	await page.screenshot({
+		path: 'test-results/mcp-manage-tools.png',
+	});
+	await page.keyboard.press('Escape');
+	await expect(panel).not.toBeVisible();
+	await page.reload();
+	await expect(row.getByText('Connected', { exact: true })).toBeVisible();
+	const id = (
+		await (
+			await context.request.get(
+				`/api/projects/${data.id}/mcp-servers`,
+			)
+		).json()
+	).items[0].id;
+	expect(
+		(
+			await context.request.post(
+				`/api/projects/${data.id}/mcp-servers/${id}/check`,
+				{
+					headers: {
+						Origin: 'https://untrusted.example',
+					},
+					data: {},
+				},
+			)
 		).status(),
 	).toBe(403);
 });

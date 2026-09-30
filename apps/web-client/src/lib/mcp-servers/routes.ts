@@ -15,6 +15,7 @@ export async function mcpRoute(
 	request: Request,
 	projectId: string,
 	serverId?: string,
+	action?: 'check' | 'discover' | 'probe',
 ) {
 	try {
 		if (
@@ -23,7 +24,10 @@ export async function mcpRoute(
 		) {
 			return json({ error: 'Connection not found.' }, 404);
 		}
-		let path = `/${projectId}/mcp-servers${serverId ? `/${serverId}` : ''}`;
+		if (action === 'probe' && serverId) {
+			return json({ error: 'Connection not found.' }, 404);
+		}
+		let path = `/${projectId}/mcp-servers${serverId ? `/${serverId}` : ''}${action ? `/${action}` : ''}`;
 		const init: RequestInit = { method: request.method };
 		if (request.method === 'GET' && !serverId) {
 			const params = new URLSearchParams({ limit: '20' });
@@ -57,7 +61,7 @@ export async function mcpRoute(
 		}
 		return json(
 			await projectApi(path, init, messages),
-			request.method === 'POST' ? 201 : 200,
+			request.method === 'POST' && !action ? 201 : 200,
 		);
 	} catch (error) {
 		if (

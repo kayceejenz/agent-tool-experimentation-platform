@@ -9,49 +9,19 @@ import {
 	FolderKanban,
 	Gauge,
 	Home,
-	PlayCircle,
 	Server,
 	Settings,
-	Wrench,
 	Workflow,
 } from 'lucide-react';
 import { useProjects } from '@/components/projects/project-provider';
 
-const groups = [
-	{
-		label: 'Integrations',
-		items: [
-			{ label: 'MCP Servers', slug: 'servers', icon: Server },
-			{ label: 'Tools', slug: 'tools', icon: Wrench },
-		],
-	},
-	{
-		label: 'Development',
-		items: [
-			{
-				label: 'Experiments',
-				slug: 'experiments',
-				icon: FlaskConical,
-			},
-			{
-				label: 'Benchmarks',
-				slug: 'benchmarks',
-				icon: Gauge,
-			},
-		],
-	},
-	{
-		label: 'AI applications',
-		items: [
-			{ label: 'Prompts', slug: 'prompts', icon: FileCode2 },
-			{ label: 'Agents', slug: 'agents', icon: Workflow },
-			{ label: 'Assistants', slug: 'assistants', icon: Bot },
-		],
-	},
-	{
-		label: 'Operations',
-		items: [{ label: 'Runs', slug: 'runs', icon: PlayCircle }],
-	},
+const projectSections = [
+	{ label: 'MCP Servers', slug: 'servers', icon: Server },
+	{ label: 'Prompts', slug: 'prompts', icon: FileCode2 },
+	{ label: 'Agents', slug: 'agents', icon: Workflow },
+	{ label: 'Assistants', slug: 'assistants', icon: Bot },
+	{ label: 'Experiments', slug: 'experiments', icon: FlaskConical },
+	{ label: 'Benchmarks', slug: 'benchmarks', icon: Gauge },
 ];
 
 export function WorkspaceNavigation({
@@ -60,14 +30,24 @@ export function WorkspaceNavigation({
 	onNavigate?: () => void;
 }) {
 	const pathname = usePathname();
-	const { projects, selectedProject, loading, error, more } = useProjects();
+	const { projects, selectedProject, loading, error, more } =
+		useProjects();
 	const router = useRouter();
 	const pathParts = pathname.split('/');
 	const project =
 		pathParts[2] && pathParts[2] !== 'new'
-			? (selectedProject?.id === pathParts[2] ? selectedProject : projects.find(item => item.id === pathParts[2]))
+			? selectedProject?.id === pathParts[2]
+				? selectedProject
+				: projects.find(
+						item =>
+							item.id ===
+							pathParts[2],
+					)
 			: projects[0];
-	const choices = project && !projects.some(item => item.id === project.id) ? [project, ...projects] : projects;
+	const choices =
+		project && !projects.some(item => item.id === project.id)
+			? [project, ...projects]
+			: projects;
 	const base = project ? `/projects/${project.id}` : undefined;
 
 	function navLink(
@@ -108,18 +88,7 @@ export function WorkspaceNavigation({
 		<nav
 			className='structured-nav'
 			aria-label='Workspace navigation'>
-			<div className='nav-group'>
-				<span className='nav-group-label'>
-					Workspace
-				</span>
-				{navLink('/', 'Overview', Home, true)}
-				{navLink(
-					'/projects',
-					'Projects',
-					FolderKanban,
-					true,
-				)}
-			</div>
+			{navLink('/projects', 'Projects', FolderKanban, true)}
 			{project ? (
 				<div className='nav-project-picker'>
 					<label htmlFor='project-picker'>
@@ -171,26 +140,32 @@ export function WorkspaceNavigation({
 				</div>
 			) : (
 				<p className='nav-guidance'>
-					{loading ? 'Loading projects…' : error ? 'Projects are unavailable. Open Projects to retry.' : 'Select a project to access its tools and settings.'}
+					{loading
+						? 'Loading projects…'
+						: error
+							? 'Projects are unavailable. Open Projects to retry.'
+							: 'Select a project to access its tools and settings.'}
 				</p>
 			)}
-			{more && <Link href='/projects' onClick={onNavigate}>Browse all projects</Link>}
-			{groups.map(group => (
-				<div className='nav-group' key={group.label}>
-					<span className='nav-group-label'>
-						{group.label}
-					</span>
-					{group.items.map(item =>
-						navLink(
-							base
-								? `${base}/${item.slug}`
-								: undefined,
-							item.label,
-							item.icon,
-						),
-					)}
-				</div>
-			))}
+			{more && (
+				<Link
+					className='nav-more'
+					href='/projects'
+					onClick={onNavigate}>
+					Browse all projects
+				</Link>
+			)}
+			<div className='nav-group'>
+				{projectSections.map(item =>
+					navLink(
+						base
+							? `${base}/${item.slug}`
+							: undefined,
+						item.label,
+						item.icon,
+					),
+				)}
+			</div>
 			<div className='nav-group nav-settings'>
 				{navLink(
 					base ? `${base}/settings` : undefined,

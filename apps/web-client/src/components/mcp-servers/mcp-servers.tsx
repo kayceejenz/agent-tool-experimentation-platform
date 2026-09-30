@@ -1,11 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, RefreshCw, Server } from 'lucide-react';
+import { Plus, RefreshCw, Settings2 } from 'lucide-react';
 import type { Project } from '@/types/workspace';
 import type { McpServer, McpServerPage } from '@/types/mcp-server';
 import { projectRequest, ProjectRequestError } from '@/lib/projects/client';
 import { ProjectSync } from '@/components/projects/project-provider';
 import { ServerForm } from './server-form';
+import { ManageServer } from './manage-server';
 
 export function McpServers({ project }: { project: Project }) {
 	const [servers, setServers] = useState<McpServer[]>([]);
@@ -13,9 +14,8 @@ export function McpServers({ project }: { project: Project }) {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [notice, setNotice] = useState('');
-	const [editing, setEditing] = useState<McpServer | null | undefined>(
-		undefined,
-	);
+	const [creating, setCreating] = useState(false);
+	const [managing, setManaging] = useState<McpServer | null>(null);
 	const [busyId, setBusyId] = useState<string | null>(null);
 	const [denied, setDenied] = useState(false);
 	const generation = useRef(0);
@@ -74,6 +74,7 @@ export function McpServers({ project }: { project: Project }) {
 		},
 		[base],
 	);
+
 	useEffect(() => {
 		const counter = generation;
 		const requestId = ++counter.current;
@@ -104,22 +105,14 @@ export function McpServers({ project }: { project: Project }) {
 			counter.current++;
 		};
 	}, [base]);
+
 	function refresh(after?: string) {
 		setLoading(true);
 		setError('');
 		void load(after);
 	}
 
-	function open(server: McpServer | null) {
-		opener.current = document.activeElement as HTMLElement;
-		setNotice('');
-		setEditing(server);
-	}
-	function close() {
-		setEditing(undefined);
-		requestAnimationFrame(() => opener.current?.focus());
-	}
-	function saved(server: McpServer) {
+	function upsert(server: McpServer) {
 		setServers(old =>
 			old.some(item => item.id === server.id)
 				? old.map(item =>
@@ -129,9 +122,28 @@ export function McpServers({ project }: { project: Project }) {
 					)
 				: [server, ...old],
 		);
+	}
+
+	function open(server: McpServer | null) {
+		opener.current = document.activeElement as HTMLElement;
+		setNotice('');
+		setError('');
+		if (server) setManaging(server);
+		else setCreating(true);
+	}
+
+	function close() {
+		setManaging(null);
+		setCreating(false);
+		requestAnimationFrame(() => opener.current?.focus());
+	}
+
+	function saved(server: McpServer) {
+		upsert(server);
 		setNotice('Connection saved.');
 		close();
 	}
+
 	async function toggle(server: McpServer) {
 		if (busyId || !canManage) return;
 		setBusyId(server.id);
@@ -151,11 +163,7 @@ export function McpServers({ project }: { project: Project }) {
 					}),
 				},
 			);
-			setServers(old =>
-				old.map(item =>
-					item.id === updated.id ? updated : item,
-				),
-			);
+			upsert(updated);
 			setNotice(
 				`${updated.name} ${updated.enabled ? 'enabled' : 'disabled'}.`,
 			);
@@ -256,12 +264,6 @@ export function McpServers({ project }: { project: Project }) {
 				)}
 				{!loading && !error && !servers.length && (
 					<div className='empty-state'>
-						<span className='empty-icon'>
-							<Server
-								size={28}
-								aria-hidden
-							/>
-						</span>
 						<h2>No MCP servers yet</h2>
 						<p>
 							{canManage
@@ -270,142 +272,180 @@ export function McpServers({ project }: { project: Project }) {
 						</p>
 					</div>
 				)}
-				<div className='mcp-list'>
-					{servers.map(server => (
-						<article
-							className='mcp-row'
-							key={server.id}
-							aria-label={
-								server.name
-							}>
-							<div className='mcp-identity'>
-								<span className='project-icon'>
-									<Server
-										size={
-											20
-										}
-										aria-hidden
-									/>
-								</span>
-								<div>
-									<h2>
-										{
-											server.name
-										}
-									</h2>
-									<p className='mcp-endpoint'>
-										{
-											server.endpoint
-										}
-									</p>
-									<span className='mcp-meta'>
-										Streamable
-										HTTP
-									</span>
-								</div>
-							</div>
-							<dl className='mcp-details'>
-								<div>
-									<dt>
+				{servers.length > 0 && (
+					<div
+						className='mcp-table-scroll'
+						role='region'
+						aria-label='MCP server table'
+						tabIndex={0}>
+						<table
+							className='mcp-table'
+							aria-label='MCP servers'>
+							<thead>
+								<tr>
+									<th
+										scope='col'
+										className='mcp-server-column'>
+										Server
+									</th>
+
+									<th
+										scope='col'
+										className='mcp-auth-column'>
 										Authentication
-									</dt>
-									<dd>
-										{server.auth_type ===
-										'none'
-											? 'None'
-											: `Bearer token · ${server.credential_configured ? 'Configured' : 'Missing'}`}
-									</dd>
-								</div>
-								<div>
-									<dt>
+									</th>
+									<th
+										scope='col'
+										className='mcp-check-column'>
 										Connection
-										check
-									</dt>
-									<dd>
-										<span
-											className={`mcp-status ${server.connection_status}`}>
-											{server.connection_status ===
-											'untested'
-												? 'Not checked'
-												: server.connection_status ===
-													  'connected'
-													? 'Connected'
-													: 'Check failed'}
+									</th>
+									<th
+										scope='col'
+										className='mcp-enabled-column'>
+										Enabled
+									</th>
+									<th
+										scope='col'
+										className='mcp-actions-column'>
+										<span className='visually-hidden'>
+											Manage
 										</span>
-										{server.last_checked_at && (
-											<time
-												dateTime={
-													server.last_checked_at
-												}>
-												{new Date(
-													server.last_checked_at,
-												).toLocaleString()}
-											</time>
-										)}
-									</dd>
-								</div>
-							</dl>
-							<div className='mcp-row-actions'>
-								{canManage ? (
-									<>
-										<button
-											className='mcp-toggle'
-											type='button'
-											role='switch'
-											aria-checked={
-												server.enabled
-											}
-											aria-label={`Enable ${server.name}`}
-											disabled={
-												loading ||
-												Boolean(
-													busyId,
-												)
-											}
-											onClick={() =>
-												void toggle(
-													server,
-												)
-											}>
-											<span
-												aria-hidden
-											/>
-											<span>
-												{busyId ===
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{servers.map(
+									server => (
+										<tr
+											key={
 												server.id
-													? 'Saving…'
-													: server.enabled
-														? 'Enabled'
-														: 'Disabled'}
-											</span>
-										</button>
-										<button
-											className='button'
-											disabled={
-												loading ||
-												Boolean(
-													busyId,
-												)
 											}
-											onClick={() =>
-												open(
-													server,
-												)
+											aria-label={
+												server.name
 											}>
-											Edit
-										</button>
-									</>
-								) : (
-									<span className='badge'>
-										{server.enabled
-											? 'Enabled'
-											: 'Disabled'}
-									</span>
+											<th scope='row'>
+												<div className='mcp-identity'>
+													<div>
+														<span className='mcp-name'>
+															{
+																server.name
+															}
+														</span>
+														<p className='mcp-endpoint'>
+															{
+																server.endpoint
+															}
+														</p>
+														<span className='mcp-meta'>
+															Streamable
+															HTTP
+														</span>
+													</div>
+												</div>
+											</th>
+
+											<td>
+												{server.auth_type ===
+												'none' ? (
+													'None'
+												) : (
+													<>
+														<span>
+															Bearer
+															token
+														</span>
+														<span className='mcp-cell-detail'>
+															{server.credential_configured
+																? 'Configured'
+																: 'Missing'}
+														</span>
+													</>
+												)}
+											</td>
+											<td>
+												<span
+													className={`mcp-status ${server.connection_status}`}>
+													{server.connection_status ===
+													'untested'
+														? 'Not checked'
+														: server.connection_status ===
+															  'connected'
+															? 'Connected'
+															: 'Check failed'}
+												</span>
+											</td>
+											<td>
+												{canManage ? (
+													<button
+														className='mcp-toggle'
+														type='button'
+														role='switch'
+														aria-checked={
+															server.enabled
+														}
+														aria-label={`Enable ${server.name}`}
+														disabled={
+															loading ||
+															Boolean(
+																busyId,
+															)
+														}
+														onClick={() =>
+															void toggle(
+																server,
+															)
+														}>
+														<span
+															aria-hidden
+														/>
+														<span>
+															{busyId ===
+															server.id
+																? 'Saving…'
+																: server.enabled
+																	? 'Enabled'
+																	: 'Disabled'}
+														</span>
+													</button>
+												) : (
+													<span className='badge'>
+														{server.enabled
+															? 'Enabled'
+															: 'Disabled'}
+													</span>
+												)}
+											</td>
+											<td className='mcp-actions-column'>
+												<button
+													className='mcp-action'
+													aria-label={`Manage ${server.name}`}
+													disabled={
+														loading ||
+														Boolean(
+															busyId,
+														)
+													}
+													onClick={() =>
+														open(
+															server,
+														)
+													}>
+													<Settings2
+														size={
+															15
+														}
+														aria-hidden
+													/>{' '}
+													Manage
+												</button>
+											</td>
+										</tr>
+									),
 								)}
-							</div>
-						</article>
-					))}
-				</div>
+							</tbody>
+						</table>
+					</div>
+				)}
 				{cursor && !loading && !error && (
 					<div className='mcp-feedback'>
 						<button
@@ -418,13 +458,24 @@ export function McpServers({ project }: { project: Project }) {
 					</div>
 				)}
 			</section>
-			{editing !== undefined && (
+			{creating && (
 				<ServerForm
-					key={editing?.id ?? 'new'}
+					key='new'
 					projectId={project.id}
-					server={editing}
+					server={null}
 					onClose={close}
 					onSaved={saved}
+					onDenied={() => setDenied(true)}
+				/>
+			)}
+			{managing && (
+				<ManageServer
+					key={managing.id}
+					server={managing}
+					projectId={project.id}
+					canManage={canManage}
+					onClose={close}
+					onUpdated={upsert}
 					onDenied={() => setDenied(true)}
 				/>
 			)}
