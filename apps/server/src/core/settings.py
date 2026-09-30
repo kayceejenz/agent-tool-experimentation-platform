@@ -54,7 +54,41 @@ class Settings(BaseSettings):
     login_rate_limit: int = Field(default=10, ge=1, le=1000)
     login_rate_window_seconds: int = Field(default=900, ge=60, le=86400)
     auth_proxy_secret: SecretStr | None = Field(default=None, min_length=32)
+    mcp_credential_key: SecretStr | None = None
+    mcp_development_origins: list[str] = []
     refresh_cookie_name: str = "agent_refresh_token"
+
+    @field_validator("mcp_credential_key", mode="before")
+    @classmethod
+    def empty_mcp_key(cls, value):
+        return None if value == "" else value
+
+    @field_validator("mcp_credential_key")
+    @classmethod
+    def validate_mcp_key(cls, value):
+        from integrations.mcp.credential_cipher import CredentialCipher
+
+        CredentialCipher(value)
+        return value
+
+    @field_validator("mcp_development_origins")
+    @classmethod
+    def validate_mcp_origins(cls, values):
+        for value in values:
+            parsed = urlsplit(value)
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.hostname
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+            ):
+                raise ValueError(
+                    "MCP development origins must be exact HTTP(S) origins"
+                )
+        return values
 
     @field_validator("auth_origins")
     @classmethod

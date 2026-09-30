@@ -1,3 +1,4 @@
+import { McpServers } from '@/components/mcp-servers/mcp-servers';
 import { ProjectRows } from '@/components/projects/project-list';
 import { ProjectForm } from '@/components/projects/project-form';
 import { ProjectSync } from '@/components/projects/project-provider';
@@ -38,8 +39,12 @@ export function ProjectList() {
 			<PageHeader
 				title='Projects'
 				description='Keep connections, agents, and experiments together.'>
-<Link className='button primary' href='/projects/new'>Create project</Link>
-</PageHeader>
+				<Link
+					className='button primary'
+					href='/projects/new'>
+					Create project
+				</Link>
+			</PageHeader>
 			<section className='panel'>
 				<ProjectRows />
 			</section>
@@ -159,7 +164,9 @@ export function ProjectOverview({ project }: { project: Project }) {
 		<>
 			<PageHeader
 				title={project.name}
-				description={project.description ?? 'No description'}></PageHeader>
+				description={
+					project.description ?? 'No description'
+				}></PageHeader>
 			<ProjectSync project={project} />
 			<ProjectTabs project={project} />
 			<section className='panel empty-state'>
@@ -168,7 +175,8 @@ export function ProjectOverview({ project }: { project: Project }) {
 				</span>
 				<h2>Start with a connection</h2>
 				<p>
-					MCP connections and tool discovery are coming soon.
+					Add an MCP server to configure the tools
+					this project can connect to.
 				</p>
 				<Link
 					className='button primary'
@@ -187,6 +195,8 @@ export function SectionView({
 	project: Project;
 	section: Section;
 }) {
+	if (section === 'servers')
+		return <McpServers key={project.id} project={project} />;
 	const details = sections[section];
 	return (
 		<>
@@ -202,17 +212,23 @@ export function SectionView({
 						settings
 					/>
 					<ProjectSync project={project} />
-					<section className='panel'><ProjectForm key={project.id} project={project} /></section>
+					<section className='panel'>
+						<ProjectForm
+							key={project.id}
+							project={project}
+						/>
+					</section>
 				</>
 			) : (
 				<section className='panel empty-state'>
-<ProjectSync project={project} />
+					<ProjectSync project={project} />
 					<span className='empty-icon'>
 						<FolderKanban size={28} />
 					</span>
 					<h2>{details.empty}</h2>
 					<p>
-						{details.title} is not available yet.
+						{details.title} is not available
+						yet.
 					</p>
 					<Link
 						className='button'

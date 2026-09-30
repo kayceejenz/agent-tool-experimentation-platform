@@ -8,6 +8,7 @@ import { themeScript } from '@/lib/theme';
 import './globals.css';
 import './auth.css';
 import './projects.css';
+import './mcp-servers.css';
 
 export const metadata: Metadata = {
 	title: 'Agent Tool Experiment Platform',

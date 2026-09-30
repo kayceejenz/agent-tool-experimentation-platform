@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from integrations.database import Database
+from integrations.mcp.credential_cipher import CredentialCipher
 from modules.auth.controllers.auth_controller import router as auth_router
 from modules.auth.helpers.passwords import Argon2idPasswordHasher
 from modules.auth.helpers.tokens import JwtAccessTokenIssuer
@@ -17,6 +18,10 @@ from modules.auth.repos.refresh_token_repo import RefreshTokenRepository
 from modules.auth.repos.user_repo import UserRepository
 from modules.auth.services.auth_service import AuthenticationService
 from modules.auth.services.rate_limit_service import AuthRateLimiter
+from modules.mcp_servers.controllers.server_controller import router as mcp_router
+from modules.mcp_servers.models.error_model import McpConnectionError
+from modules.mcp_servers.repos.server_repo import ServerRepository
+from modules.mcp_servers.services.server_service import ServerService
 from modules.projects.controllers.project_controller import router as project_router
 from modules.projects.repos.project_repo import ProjectRepository
 from modules.projects.services.project_service import ProjectService
@@ -79,6 +84,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         instance.state.database = database
         instance.state.projects = ProjectService(ProjectRepository(database))
+        instance.state.mcp_servers = ServerService(
+            ServerRepository(database),
+            CredentialCipher(config.mcp_credential_key),
+            config,
+        )
         try:
             await database.open()
             yield
@@ -91,6 +101,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     instance.include_router(auth_router, prefix="/api/v1")
     instance.include_router(project_router, prefix="/api/v1")
+    instance.include_router(mcp_router, prefix="/api/v1")
+
+    @instance.exception_handler(McpConnectionError)
+    async def mcp_failure(request: Request, error: McpConnectionError):
+        return JSONResponse(
+            status_code=error.status,
+            content={"detail": str(error)},
+            headers={"Cache-Control": "no-store"},
+        )
 
     @instance.middleware("http")
     async def auth_cache_control(request: Request, call_next):
