@@ -1,0 +1,4 @@
+/runtime/
+/outputs/
+/scripts/seed-data.json
+scripts/node_modules
