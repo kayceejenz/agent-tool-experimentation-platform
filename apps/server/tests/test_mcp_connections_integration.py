@@ -6,12 +6,13 @@ from uuid import UUID
 
 import psycopg
 import pytest
-from api.main import create_app
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
+
+from api.main import create_app
 from integrations.mcp.credential_cipher import CredentialCipher
 from migrations import migrate
 from modules.mcp_servers.models.error_model import McpConnectionError
-from pydantic import SecretStr
 
 pytestmark = pytest.mark.integration
 TOKEN = "demo-secret-token"
@@ -310,3 +311,146 @@ def test_concurrent_configuration_updates_detect_conflict(connections):
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(change, ["One", "Two"])) == [200, 409]
+
+
+def test_check_and_discover_permissions_status_and_credentials(
+    connections, monkeypatch
+):
+    from integrations.mcp.client import ProbeFailure
+    from modules.mcp_servers.services import server_service
+
+    client, _config, users, _project, path = connections
+    server = create(client, path, users[0][1])
+    url = path + "/" + server["id"]
+    calls = []
+
+    async def successful(endpoint, token, settings, discover=False):
+        assert token.get_secret_value() == TOKEN
+        calls.append(discover)
+        return (
+            [
+                {
+                    "name": "inspect_dataset",
+                    "description": "Inspect",
+                    "input_schema": {"type": "object"},
+                }
+            ]
+            if discover
+            else []
+        )
+
+    monkeypatch.setattr(server_service, "probe", successful)
+    assert client.post(url + "/check", headers=users[2][1]).status_code == 403
+    assert client.post(url + "/discover", headers=users[3][1]).status_code == 404
+    assert calls == []
+    response = client.post(url + "/check", headers=users[0][1])
+    assert response.status_code == 200
+    assert TOKEN not in response.text
+    assert response.json()["server"]["connection_status"] == "connected"
+    assert response.json()["server"]["enabled"] is False
+    assert response.json()["server"]["last_checked_at"]
+    response = client.post(url + "/discover", headers=users[1][1])
+    assert response.json()["tools"][0]["name"] == "inspect_dataset"
+    assert (
+        client.get(url, headers=users[0][1]).json()["connection_status"] == "connected"
+    )
+
+    async def failed(*args):
+        raise ProbeFailure("authentication_failed")
+
+    monkeypatch.setattr(server_service, "probe", failed)
+    response = client.post(url + "/check", headers=users[0][1])
+    assert response.json()["server"]["connection_status"] == "error"
+    assert response.json()["server"]["last_error_code"] == "authentication_failed"
+    assert response.json()["tools"] is None
+
+
+def test_probe_validates_unsaved_connection_without_persisting(
+    connections, monkeypatch
+):
+    from integrations.mcp.client import ProbeFailure
+    from modules.mcp_servers.services import server_service
+
+    client, config, users, _project, path = connections
+    calls = []
+
+    async def reachable(endpoint, token, settings, discover=False):
+        calls.append((endpoint, token.get_secret_value() if token else None))
+        return []
+
+    monkeypatch.setattr(server_service, "probe", reachable)
+    response = client.post(
+        path + "/probe",
+        headers=users[0][1],
+        json={
+            "endpoint": "http://localhost:8012/mcp",
+            "auth_type": "bearer",
+            "credential": TOKEN,
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"reachable": True, "error_code": None}
+    assert TOKEN not in response.text
+    assert calls == [("http://localhost:8012/mcp", TOKEN)]
+    assert client.get(path, headers=users[0][1]).json()["items"] == []
+    assert (
+        query(config, "SELECT count(*) FROM agent_platform.mcp_servers")[0][0] == 0
+    )
+    assert (
+        query(
+            config,
+            "SELECT count(*) FROM agent_platform.mcp_server_credentials",
+        )[0][0]
+        == 0
+    )
+
+    async def failed(*args):
+        raise ProbeFailure("authentication_failed")
+
+    monkeypatch.setattr(server_service, "probe", failed)
+    response = client.post(
+        path + "/probe",
+        headers=users[0][1],
+        json={
+            "endpoint": "http://localhost:8012/mcp",
+            "auth_type": "bearer",
+            "credential": TOKEN,
+        },
+    )
+    assert response.json() == {
+        "reachable": False,
+        "error_code": "authentication_failed",
+    }
+
+    assert client.post(path + "/probe", headers=users[2][1], json={
+        "endpoint": "http://localhost:8012/mcp",
+    }).status_code == 403
+    assert client.post(path + "/probe", headers=users[0][1], json={
+        "endpoint": "http://localhost:8012/mcp",
+        "auth_type": "bearer",
+    }).status_code == 422
+    assert client.post(path + "/probe", headers=users[0][1], json={
+        "endpoint": "http://example.com/mcp",
+    }).status_code == 422
+
+
+def test_check_does_not_overwrite_changed_configuration(connections, monkeypatch):
+    from modules.mcp_servers.services import server_service
+
+    client, config, users, _project, path = connections
+    server = create(client, path, users[0][1])
+    url = path + "/" + server["id"]
+
+    async def changed(*args):
+        query(
+            config,
+            "UPDATE agent_platform.mcp_servers SET name='Changed', config_version=config_version+1 WHERE id=%s",
+            (server["id"],),
+        )
+        return []
+
+    monkeypatch.setattr(server_service, "probe", changed)
+    assert client.post(url + "/check", headers=users[0][1]).status_code == 409
+    current = client.get(url, headers=users[0][1]).json()
+    assert current["name"] == "Changed"
+    assert current["connection_status"] == "untested"

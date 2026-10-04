@@ -7,6 +7,9 @@ from modules.mcp_servers.models.server_model import McpServer
 
 class ServerRepositoryContract(Protocol):
     async def authorize(self, user_id: UUID, project_id: UUID) -> None: ...
+    async def snapshot(
+        self, user_id: UUID, project_id: UUID, server_id: UUID
+    ) -> tuple[McpServer, bytes | None]: ...
     async def create(
         self,
         user_id: UUID,

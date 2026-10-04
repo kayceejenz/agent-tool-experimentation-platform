@@ -83,6 +83,20 @@ class ServerRepository:
                 await self.member(db, user_id, project_id, False)
                 return await self.read(db, project_id, server_id)
 
+    async def snapshot(self, user_id: UUID, project_id: UUID, server_id: UUID):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await self.member(db, user_id, project_id, True)
+                # Membership lock serializes configuration and credential updates.
+                server = await self.read(db, project_id, server_id)
+                row = await (
+                    await db.execute(
+                        "SELECT encrypted_value FROM agent_platform.mcp_server_credentials WHERE server_id=%s",
+                        (server_id,),
+                    )
+                ).fetchone()
+                return server, row["encrypted_value"] if row else None
+
     async def list(
         self,
         user_id: UUID,

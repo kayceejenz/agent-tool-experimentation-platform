@@ -7,10 +7,13 @@ from fastapi import APIRouter, Depends, Query, Request
 from modules.auth.models.auth_user_model import AuthenticatedUser
 from modules.mcp_servers.dtos.server_request_dto import (
     CreateServerRequest,
+    ProbeServerRequest,
     UpdateServerRequest,
 )
 from modules.mcp_servers.dtos.server_response_dto import (
+    ServerInspectionResponse,
     ServerListResponse,
+    ServerProbeResponse,
     ServerResponse,
 )
 from modules.mcp_servers.services.server_service import ServerService
@@ -31,6 +34,11 @@ async def create_server(
     project_id: UUID, body: CreateServerRequest, user: User, servers: Service
 ):
     return await servers.create(user.id, project_id, body)
+
+
+@router.post("/probe", response_model=ServerProbeResponse)
+async def probe_server(project_id: UUID, body: ProbeServerRequest, user: User, servers: Service):
+    return await servers.probe_unsaved(user.id, project_id, body)
 
 
 @router.get("", response_model=ServerListResponse)
@@ -58,3 +66,15 @@ async def update_server(
     servers: Service,
 ):
     return await servers.update(user.id, project_id, server_id, body)
+
+
+@router.post("/{server_id}/check", response_model=ServerInspectionResponse)
+async def check_server(project_id: UUID, server_id: UUID, user: User, servers: Service):
+    return await servers.inspect(user.id, project_id, server_id)
+
+
+@router.post("/{server_id}/discover", response_model=ServerInspectionResponse)
+async def discover_tools(
+    project_id: UUID, server_id: UUID, user: User, servers: Service
+):
+    return await servers.inspect(user.id, project_id, server_id, discover=True)

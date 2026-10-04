@@ -1,6 +1,8 @@
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from core.settings import Settings
+from integrations.mcp.client import ProbeFailure, probe
 from integrations.mcp.credential_cipher import (
     CredentialCipher,
     CredentialStorageUnavailable,
@@ -95,14 +97,14 @@ class ServerService:
         auth_type = body.auth_type or current.auth_type
 
         credential_supplied = "credential" in body.model_fields_set
-        
+
         endpoint_changed = endpoint != current.endpoint
-        
+
         auth_changed = auth_type != current.auth_type
-        
+
         if auth_type == "none" and body.credential is not None:
             raise McpConnectionError(422, "Credentials require bearer authentication")
-        
+
         if auth_type == "bearer":
             if credential_supplied and body.credential is None:
                 raise McpConnectionError(
@@ -137,3 +139,53 @@ class ServerService:
             replace,
             encrypted,
         )
+
+    async def probe_unsaved(self, user_id: UUID, project_id: UUID, body):
+        """Verify a connection before it is stored. Nothing is persisted."""
+        await self.repository.authorize(user_id, project_id)
+        endpoint = validate_endpoint(body.endpoint, self.settings)
+        try:
+            await probe(endpoint, body.credential, self.settings)
+        except ProbeFailure as error:
+            return {"reachable": False, "error_code": error.code}
+        return {"reachable": True, "error_code": None}
+
+    async def inspect(self, user_id, project_id, server_id, discover=False):
+        current, encrypted = await self.repository.snapshot(
+            user_id, project_id, server_id
+        )
+        token = None
+        if current.auth_type == "bearer":
+            try:
+                if encrypted is None:
+                    raise CredentialStorageUnavailable
+                token = self.cipher.decrypt(
+                    encrypted, project_id, server_id, current.endpoint
+                )
+            except CredentialStorageUnavailable:
+                raise McpConnectionError(
+                    503, "Credential storage unavailable"
+                ) from None
+        code = None
+        tools = []
+        try:
+            tools = await probe(current.endpoint, token, self.settings, discover)
+        except ProbeFailure as error:
+            code = error.code
+        updated = await self.repository.update(
+            user_id,
+            project_id,
+            server_id,
+            current.config_version,
+            {
+                "connection_status": "error" if code else "connected",
+                "last_checked_at": datetime.now(UTC),
+                "last_error_code": code,
+            },
+            False,
+            None,
+        )
+        return {
+            "server": updated,
+            "tools": tools if discover and code is None else None,
+        }

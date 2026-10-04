@@ -29,3 +29,19 @@ class ServerResponse(BaseModel):
 class ServerListResponse(BaseModel):
     items: list[ServerResponse]
     next_cursor: str | None
+
+
+class DiscoveredToolResponse(BaseModel):
+    name: str
+    description: str | None
+    input_schema: dict
+
+
+class ServerInspectionResponse(BaseModel):
+    server: ServerResponse
+    tools: list[DiscoveredToolResponse] | None
+
+
+class ServerProbeResponse(BaseModel):
+    reachable: bool
+    error_code: str | None = None

@@ -51,6 +51,20 @@ class CreateServerRequest(CredentialRequest):
         return self
 
 
+class ProbeServerRequest(CredentialRequest):
+    endpoint: Endpoint
+    transport: Literal["streamable_http"] = "streamable_http"
+    auth_type: AuthType = "none"
+
+    @model_validator(mode="after")
+    def credential_matches_auth(self):
+        if (self.auth_type == "bearer") != (self.credential is not None):
+            raise ValueError(
+                "Bearer authentication requires a credential; no authentication must omit it"
+            )
+        return self
+
+
 class UpdateServerRequest(CredentialRequest):
     name: Name | None = None
     endpoint: Endpoint | None = None
