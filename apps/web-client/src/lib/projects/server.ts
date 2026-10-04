@@ -36,7 +36,7 @@ export async function projectApi(
 				},
 				cache: 'no-store',
 				redirect: 'error',
-				signal: AbortSignal.timeout(10_000),
+				signal: AbortSignal.timeout(path.includes('/tools/') && path.endsWith('/executions') ? 13_000 : 10_000),
 			},
 		);
 	} catch {

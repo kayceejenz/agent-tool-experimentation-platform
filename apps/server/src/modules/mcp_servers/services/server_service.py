@@ -184,6 +184,7 @@ class ServerService:
             },
             False,
             None,
+            discovered_tools=tools if discover and code is None else None,
         )
         return {
             "server": updated,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Protocol
 from uuid import UUID
@@ -37,4 +39,5 @@ class ServerRepositoryContract(Protocol):
         changes: dict,
         replace_credential: bool,
         encrypted: bytes | None,
+        discovered_tools: list | None = None,
     ) -> McpServer: ...

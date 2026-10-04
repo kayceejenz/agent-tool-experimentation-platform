@@ -8,6 +8,7 @@ import signal
 import subprocess
 import sys
 import time
+from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 from uuid import uuid4
@@ -20,7 +21,8 @@ from migrations import migrate
 
 apps = Path(__file__).resolve().parents[2]
 server = apps / 'server'
-demo = apps / 'mcps' / 'data-analysis'
+demo = apps / 'mcps' / 'ecommerce'
+demo_data = TemporaryDirectory(prefix='agent-mcp-browser-')
 base = os.environ.get('AGENT_TEST_DATABASE_URL') or dotenv_values(server / '.env').get('AGENT_TEST_DATABASE_URL')
 if not base or not urlsplit(base).path.endswith('_test'):
     raise SystemExit('Set AGENT_TEST_DATABASE_URL to a dedicated database ending in _test.')
@@ -58,8 +60,8 @@ try:
         'SERVER_API_URL': 'http://127.0.0.1:8011', 'APP_ORIGIN': 'http://127.0.0.1:3101',
     })
     demo_server = subprocess.Popen(
-        [str(demo / '.venv' / 'bin' / 'python'), '-m', 'data_analysis.server'],
-        env={**env, 'AGENT_DATA_ANALYSIS_PORT': '8013', 'PYTHONPATH': str(demo / 'src')},
+        [str(demo / '.venv' / 'bin' / 'python'), '-m', 'ecommerce_mcp.server'],
+        env={**env, 'ECOMMERCE_PORT': '8013', 'ECOMMERCE_DATA_DIR': demo_data.name, 'PYTHONPATH': str(demo / 'src')},
         cwd=demo, start_new_session=True)
     children.append(demo_server)
     api = subprocess.Popen([sys.executable, '-c',
@@ -106,3 +108,5 @@ finally:
                 child.wait()
     with psycopg.connect(base, autocommit=True) as admin:
         admin.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(name)))
+
+    demo_data.cleanup()

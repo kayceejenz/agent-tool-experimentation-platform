@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID
 
@@ -128,6 +130,7 @@ class ServerRepository:
         changes: dict,
         replace_credential: bool,
         encrypted: bytes | None,
+        discovered_tools: list | None = None,
     ) -> McpServer:
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
@@ -179,4 +182,13 @@ class ServerRepository:
                             "INSERT INTO agent_platform.mcp_server_credentials(server_id,encrypted_value) VALUES (%s,%s) ON CONFLICT(server_id) DO UPDATE SET encrypted_value=excluded.encrypted_value",
                             (server_id, encrypted),
                         )
+                from modules.tools.repos.tool_repo import sync_tools
+
+                if changes.get("connection_status") == "untested":
+                    await db.execute(
+                        "UPDATE agent_platform.mcp_tools SET available=false,enabled=false WHERE server_id=%s",
+                        (server_id,),
+                    )
+                if discovered_tools is not None:
+                    await sync_tools(db, server_id, discovered_tools)
                 return await self.read(db, project_id, server_id)

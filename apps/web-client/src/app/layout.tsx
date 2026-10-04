@@ -9,6 +9,7 @@ import './globals.css';
 import './auth.css';
 import './projects.css';
 import './mcp-servers.css';
+import './tools.css';
 
 export const metadata: Metadata = {
 	title: 'Agent Tool Experiment Platform',

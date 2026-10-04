@@ -17,7 +17,7 @@ async function add(
 	page: import('@playwright/test').Page,
 	name: string,
 	token = '',
-	endpoint = 'http://localhost:8012/mcp',
+	endpoint = 'http://127.0.0.1:8013/mcp',
 ) {
 	await page
 		.getByRole('button', { name: 'Add server', exact: true })
@@ -94,10 +94,12 @@ test('manage a real connection without exposing stored tokens', async ({
 	await panel.getByRole('button', { name: 'Edit connection' }).click();
 	await panel
 		.getByLabel('Endpoint URL')
-		.fill('http://localhost:8012/updated');
+		.fill('http://localhost:8013/mcp');
 	await expect(
 		panel.getByLabel('Replacement bearer token'),
 	).toHaveAttribute('required', '');
+	// Return to the live endpoint to test credential rotation after checking the endpoint guard.
+	await panel.getByLabel('Endpoint URL').fill('http://127.0.0.1:8013/mcp');
 	await panel
 		.getByLabel('Replacement bearer token')
 		.fill('test-only-replacement');
@@ -115,7 +117,7 @@ test('manage a real connection without exposing stored tokens', async ({
 	await page.keyboard.press('Escape');
 	await expect(panel).not.toBeVisible();
 	await page.reload();
-	await expect(renamed).toContainText('http://localhost:8012/updated');
+	await expect(renamed).toContainText('http://127.0.0.1:8013/mcp');
 	const response = await context.request.get(
 		`/api/projects/${data.id}/mcp-servers`,
 	);
@@ -168,7 +170,7 @@ test('forms support mobile, keyboard dismissal, failure recovery, and denied wri
 		.fill('Retained name');
 	await dialog
 		.getByLabel('Endpoint URL')
-		.fill('http://localhost:8012/mcp');
+		.fill('http://127.0.0.1:8013/mcp');
 	await page.route(`**/api/projects/${data.id}/mcp-servers`, route =>
 		route.request().method() === 'POST'
 			? route.fulfill({
@@ -362,9 +364,9 @@ test('check a live MCP connection and discover tool schemas', async ({
 	await expect(panel.getByRole('status')).toContainText(
 		'tools discovered',
 	);
-	await panel.locator('summary', { hasText: 'inspect_dataset' }).click();
+	await panel.locator('summary', { hasText: 'search_products' }).click();
 	await expect(panel.locator('details[open] pre')).toContainText(
-		'dataset_id',
+		'query',
 	);
 	await page.screenshot({
 		path: 'test-results/mcp-manage-tools.png',

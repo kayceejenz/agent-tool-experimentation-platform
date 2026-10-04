@@ -5,7 +5,7 @@ import socket
 from ipaddress import ip_address
 
 import httpx
-from mcp import ClientSession
+from mcp import ClientSession, types
 from mcp.client.streamable_http import streamable_http_client
 from modules.mcp_servers.helpers.endpoint import validate_endpoint
 
@@ -137,6 +137,12 @@ async def probe(endpoint, token, settings, discover=False):
                                     "name": tool.name,
                                     "description": tool.description,
                                     "input_schema": tool.inputSchema,
+                                    "output_schema": tool.outputSchema,
+                                    "annotations": tool.annotations.model_dump(
+                                        exclude_none=True
+                                    )
+                                    if tool.annotations
+                                    else {},
                                 }
                             )
                         cursor = page.nextCursor
@@ -150,4 +156,45 @@ async def probe(endpoint, token, settings, discover=False):
                 return tools
     except Exception as error:  # noqa: BLE001 - sanitize all third-party transport failures
         # Never surface upstream errors, URLs, headers, or decrypted credentials.
+        raise ProbeFailure(failure_code(error)) from None
+
+
+async def execute_tool(endpoint, token, settings, name, arguments):
+    """One bounded invocation; never retry a potentially mutating call."""
+    try:
+        async with asyncio.timeout(7):
+            url, ip = await resolve_endpoint(endpoint, settings)
+            headers = (
+                {"Authorization": f"Bearer {token.get_secret_value()}"} if token else {}
+            )
+            async with (
+                httpx.AsyncClient(
+                    transport=PinnedTransport(url, ip),
+                    headers=headers,
+                    follow_redirects=False,
+                    trust_env=False,
+                    timeout=5,
+                ) as client,
+                streamable_http_client(str(url), http_client=client) as (
+                    read,
+                    write,
+                    _,
+                ),
+                ClientSession(read, write) as session,
+            ):
+                await session.initialize()
+                # Avoid SDK output-schema discovery/validation, which can resolve
+                # arbitrary remote schema references inside the API process.
+                result = await session.send_request(
+                    types.ClientRequest(
+                        types.CallToolRequest(
+                            params=types.CallToolRequestParams(
+                                name=name, arguments=arguments
+                            )
+                        )
+                    ),
+                    types.CallToolResult,
+                )
+                return result.model_dump(mode="json", by_alias=True, exclude_none=True)
+    except Exception as error:
         raise ProbeFailure(failure_code(error)) from None

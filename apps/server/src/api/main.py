@@ -25,6 +25,9 @@ from modules.mcp_servers.services.server_service import ServerService
 from modules.projects.controllers.project_controller import router as project_router
 from modules.projects.repos.project_repo import ProjectRepository
 from modules.projects.services.project_service import ProjectService
+from modules.tools.controllers.tool_controller import router as tools_router
+from modules.tools.repos.tool_repo import ToolRepository
+from modules.tools.services.tool_service import ToolService
 from psycopg import Error as DatabaseError
 from psycopg_pool import PoolClosed, PoolTimeout, TooManyRequests
 from pydantic import BaseModel
@@ -89,6 +92,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             CredentialCipher(config.mcp_credential_key),
             config,
         )
+        instance.state.tools = ToolService(
+            ToolRepository(database),
+            CredentialCipher(config.mcp_credential_key),
+            config,
+        )
         try:
             await database.open()
             yield
@@ -102,6 +110,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     instance.include_router(auth_router, prefix="/api/v1")
     instance.include_router(project_router, prefix="/api/v1")
     instance.include_router(mcp_router, prefix="/api/v1")
+    instance.include_router(tools_router, prefix="/api/v1")
 
     @instance.exception_handler(McpConnectionError)
     async def mcp_failure(request: Request, error: McpConnectionError):

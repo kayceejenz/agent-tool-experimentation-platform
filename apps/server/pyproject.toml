@@ -19,6 +19,7 @@ dependencies = [
   "cryptography>=46,<49",
   "mcp>=1.26,<2",
   "httpx>=0.28,<1",
+  "jsonschema>=4.23,<5",
 ]
 
 [project.scripts]

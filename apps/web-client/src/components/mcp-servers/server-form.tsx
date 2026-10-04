@@ -33,9 +33,7 @@ export function ServerForm({
 	const [credential, setCredential] = useState('');
 	const [busy, setBusy] = useState(false);
 	const [checking, setChecking] = useState(false);
-	const [verified, setVerified] = useState(false);
 	const [error, setError] = useState('');
-	const [notice, setNotice] = useState('');
 	const [denied, setDenied] = useState(false);
 	const needsCredential =
 		auth === 'bearer' &&
@@ -48,11 +46,6 @@ export function ServerForm({
 		nameInput.current?.focus();
 		return () => element?.close();
 	}, [inline]);
-
-	function resetVerification() {
-		setVerified(false);
-		setNotice('');
-	}
 
 	function validate(): string | null {
 		if (!name.trim()) return 'Enter a server name.';
@@ -79,14 +72,10 @@ export function ServerForm({
 		const invalid = validate();
 		if (invalid) {
 			setError(invalid);
-			setVerified(false);
-			setNotice('');
 			return false;
 		}
 		setChecking(true);
 		setError('');
-		setNotice('');
-		setVerified(false);
 		try {
 			const result = await projectRequest<{
 				reachable: boolean;
@@ -111,10 +100,6 @@ export function ServerForm({
 				);
 				return false;
 			}
-			setVerified(true);
-			setNotice(
-				'Connection verified. Save to add this MCP server.',
-			);
 			return true;
 		} catch (error) {
 			setError(
@@ -144,12 +129,17 @@ export function ServerForm({
 			setError(invalid);
 			return;
 		}
-		if (!(await testConnection())) return;
 		setBusy(true);
 		onBusyChange?.(true);
 		setError('');
-		setNotice('');
 		try {
+			const connectionChanged =
+				!server ||
+				endpoint.trim() !== server.endpoint ||
+				auth !== server.auth_type ||
+				Boolean(credential);
+			if (connectionChanged && !(await testConnection()))
+				return;
 			const result = await projectRequest<McpServer>(
 				`/${projectId}/mcp-servers${server ? `/${server.id}` : ''}`,
 				{

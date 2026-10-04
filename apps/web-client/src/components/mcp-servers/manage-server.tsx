@@ -1,4 +1,6 @@
 'use client';
+import Link from 'next/link';
+import type { ToolPage } from '@/types/tool';
 import { useEffect, useRef, useState } from 'react';
 import { PlugZap, RefreshCw, Settings2, Wrench, X } from 'lucide-react';
 import type { McpServer } from '@/types/mcp-server';
@@ -64,6 +66,35 @@ export function ManageServer({
 			document.body.style.overflow = previousOverflow;
 		};
 	}, []);
+
+	useEffect(() => {
+		let active = true;
+		void projectRequest<ToolPage>(
+			`/${projectId}/tools?server_id=${initial.id}`,
+		)
+			.then(page => {
+				if (active)
+					setTools(
+						page.items.map(tool => ({
+							name: tool.name,
+							description:
+								tool.definition
+									.description ??
+								null,
+							input_schema:
+								tool.definition
+									.input_schema,
+						})),
+					);
+			})
+			.catch(() => {
+				if (active)
+					setError('Unable to load saved tools.');
+			});
+		return () => {
+			active = false;
+		};
+	}, [projectId, initial.id]);
 
 	function request<T>(path: string, init?: RequestInit) {
 		return projectRequest<T>(
@@ -147,7 +178,7 @@ export function ManageServer({
 				},
 			);
 			apply(result.server);
-			setTools(result.tools ?? []);
+			if (result.tools !== null) setTools(result.tools);
 			if (result.server.connection_status === 'error') {
 				setError(
 					checkErrors[
@@ -434,8 +465,7 @@ export function ManageServer({
 										{operation ===
 										'discover'
 											? 'Discovering…'
-											: tools ===
-												  null
+											: !tools?.length
 												? 'Discover'
 												: 'Refresh'}
 									</button>
@@ -448,6 +478,12 @@ export function ManageServer({
 								Discovery never
 								executes them.
 							</p>
+							<Link
+								className='text-link'
+								href={`/projects/${projectId}/tools`}>
+								Manage and test
+								saved tools
+							</Link>
 							{tools === null ? (
 								<div className='mcp-tools-empty'>
 									<Wrench

@@ -1,3 +1,4 @@
+import { Tools } from '@/components/tools/tools';
 import { McpServers } from '@/components/mcp-servers/mcp-servers';
 import { ProjectRows } from '@/components/projects/project-list';
 import { ProjectForm } from '@/components/projects/project-form';
@@ -181,6 +182,7 @@ export function SectionView({
 	project: Project;
 	section: Section;
 }) {
+	if (section === 'tools') return <Tools key={project.id} project={project} />;
 	if (section === 'servers')
 		return <McpServers key={project.id} project={project} />;
 	const details = sections[section];

@@ -4,6 +4,7 @@ export const sections: Record<
 	Section,
 	{ title: string; description: string; empty: string }
 > = {
+	tools: {title: 'Tools', description: 'Manage and test the tools available to this project.', empty: 'No tools discovered'},
 	servers: {
 		title: 'MCP Servers',
 		description: 'Connect the systems your agents can work with.',

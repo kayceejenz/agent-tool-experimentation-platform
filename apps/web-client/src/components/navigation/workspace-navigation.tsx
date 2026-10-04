@@ -12,11 +12,13 @@ import {
 	Server,
 	Settings,
 	Workflow,
+	Wrench,
 } from 'lucide-react';
 import { useProjects } from '@/components/projects/project-provider';
 
 const projectSections = [
 	{ label: 'MCP Servers', slug: 'servers', icon: Server },
+	{ label: 'Tools', slug: 'tools', icon: Wrench },
 	{ label: 'Prompts', slug: 'prompts', icon: FileCode2 },
 	{ label: 'Agents', slug: 'agents', icon: Workflow },
 	{ label: 'Assistants', slug: 'assistants', icon: Bot },
