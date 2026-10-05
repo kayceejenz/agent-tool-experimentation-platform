@@ -63,3 +63,19 @@ pnpm start
 4. Choose **Manage**, enter inputs using the form or JSON editor, and select **Run tool**.
 
 Discovery saves tool definitions and revisions. New or changed tools start disabled; rediscover after changing an endpoint or credential. Manual test history saves the revision, redacted inputs/results, status, and duration. A timeout can have an unknown remote outcome—check the history and remote records before repeating a write.
+
+### Prompt management
+
+Open **Prompts** within a project to create System, Agent, or Evaluation prompts. Use **Manage** to edit instructions or inspect revision history. A prompt's type is fixed; edits to its name, description, or instructions create a new immutable revision. Owners and editors can save changes; viewers can inspect prompts and history. Concurrent edits require reloading the latest revision before saving.
+
+This increment manages prompt definitions. Selecting revisions for agents and running evaluations will be added in their respective milestones.
+
+The ecommerce experiment starter prompts are maintained in `apps/mcps/ecommerce/prompts/`: `system.md` defines shared rules, `agent.md` describes the MCP workflows, and `evaluation.md` defines a trace-based assessment rubric. They are editable after being saved in the prompt library; evaluation execution belongs to the later evaluation milestone.
+
+To add this set to a project, run from `apps/server` with the project's UUID and an owner/editor's user UUID:
+
+```sh
+uv run --locked python scripts/seed_ecommerce_prompts.py --project <project-uuid> --actor <user-uuid>
+```
+
+This explicit seed operation creates revision 1 once. Re-running it preserves existing prompts and edits; it does not automatically update saved prompts when the source files change.

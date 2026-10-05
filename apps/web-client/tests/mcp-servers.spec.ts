@@ -99,7 +99,9 @@ test('manage a real connection without exposing stored tokens', async ({
 		panel.getByLabel('Replacement bearer token'),
 	).toHaveAttribute('required', '');
 	// Return to the live endpoint to test credential rotation after checking the endpoint guard.
-	await panel.getByLabel('Endpoint URL').fill('http://127.0.0.1:8013/mcp');
+	await panel
+		.getByLabel('Endpoint URL')
+		.fill('http://127.0.0.1:8013/mcp');
 	await panel
 		.getByLabel('Replacement bearer token')
 		.fill('test-only-replacement');
@@ -365,9 +367,7 @@ test('check a live MCP connection and discover tool schemas', async ({
 		'tools discovered',
 	);
 	await panel.locator('summary', { hasText: 'search_products' }).click();
-	await expect(panel.locator('details[open] pre')).toContainText(
-		'query',
-	);
+	await expect(panel.locator('details[open] pre')).toContainText('query');
 	await page.screenshot({
 		path: 'test-results/mcp-manage-tools.png',
 	});

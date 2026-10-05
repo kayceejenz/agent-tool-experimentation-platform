@@ -91,7 +91,7 @@ try:
             time.sleep(0.1)
     else:
         raise RuntimeError('Demo MCP server did not become ready')
-    web = subprocess.Popen(['pnpm', 'exec', 'next', 'start', '--hostname', '127.0.0.1', '--port', '3101'], env=env, start_new_session=True)
+    web = subprocess.Popen(['node', str(apps / 'web-client' / 'node_modules' / 'next' / 'dist' / 'bin' / 'next'), 'start', '--hostname', '127.0.0.1', '--port', '3101'], env=env, start_new_session=True)
     children.append(web)
     while all(child.poll() is None for child in children):
         time.sleep(0.5)

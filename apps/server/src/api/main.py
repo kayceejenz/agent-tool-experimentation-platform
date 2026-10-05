@@ -25,6 +25,9 @@ from modules.mcp_servers.services.server_service import ServerService
 from modules.projects.controllers.project_controller import router as project_router
 from modules.projects.repos.project_repo import ProjectRepository
 from modules.projects.services.project_service import ProjectService
+from modules.prompts.controllers.prompt_controller import router as prompts_router
+from modules.prompts.models.error_model import PromptError
+from modules.prompts.repos.prompt_repo import PromptRepository
 from modules.tools.controllers.tool_controller import router as tools_router
 from modules.tools.repos.tool_repo import ToolRepository
 from modules.tools.services.tool_service import ToolService
@@ -85,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 config.login_rate_limit,
                 config.login_rate_window_seconds,
             )
+        instance.state.prompts = PromptRepository(database)
         instance.state.database = database
         instance.state.projects = ProjectService(ProjectRepository(database))
         instance.state.mcp_servers = ServerService(
@@ -111,7 +115,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     instance.include_router(project_router, prefix="/api/v1")
     instance.include_router(mcp_router, prefix="/api/v1")
     instance.include_router(tools_router, prefix="/api/v1")
+    instance.include_router(prompts_router, prefix="/api/v1")
 
+    @instance.exception_handler(PromptError)
     @instance.exception_handler(McpConnectionError)
     async def mcp_failure(request: Request, error: McpConnectionError):
         return JSONResponse(

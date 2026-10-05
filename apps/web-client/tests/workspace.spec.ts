@@ -16,7 +16,11 @@ test('empty workspace has no sample data or project-scoped links', async ({
 		fullPage: true,
 	});
 	await expect(page.getByLabel('Switch project')).toHaveCount(0);
-	await expect(page.locator('a[href^="/projects/"]:not([href="/projects/new"])')).toHaveCount(0);
+	await expect(
+		page.locator(
+			'a[href^="/projects/"]:not([href="/projects/new"])',
+		),
+	).toHaveCount(0);
 	await expect(
 		page.getByText(
 			/Sales research|Support assistant|Sample project|Preview data/,
