@@ -26,7 +26,7 @@ test('create prompts, preserve revisions, filter types and recover from stale ed
 		.getByLabel('Description')
 		.fill('Shared ecommerce instructions');
 	await dialog
-		.getByLabel('Instructions')
+		.getByRole('textbox', { name: /^Instructions/ })
 		.fill('Use GBP.\nNever invent prices.');
 	await dialog
 		.getByRole('button', { name: 'Create prompt', exact: true })
@@ -35,7 +35,7 @@ test('create prompts, preserve revisions, filter types and recover from stale ed
 		'Revision 1 saved.',
 	);
 	await dialog
-		.getByLabel('Instructions')
+		.getByRole('textbox', { name: /^Instructions/ })
 		.fill('Use GBP.\nConfirm invoice details.');
 	await dialog.getByRole('button', { name: 'Save new revision' }).click();
 	await expect(dialog.getByRole('status')).toContainText(
@@ -64,7 +64,7 @@ test('create prompts, preserve revisions, filter types and recover from stale ed
 	await page
 		.getByRole('button', { name: 'Manage Commerce rules' })
 		.click();
-	await expect(dialog.getByLabel('Instructions')).toHaveValue(
+	await expect(dialog.getByRole('textbox', { name: /^Instructions/ })).toHaveValue(
 		'Use GBP.\nConfirm invoice details.',
 	);
 	await context.request.post(`${base}/${prompt.id}/revisions`, {
@@ -76,10 +76,10 @@ test('create prompts, preserve revisions, filter types and recover from stale ed
 			base_revision: 2,
 		},
 	});
-	await dialog.getByLabel('Instructions').fill('Keep my local edit');
+	await dialog.getByRole('textbox', { name: /^Instructions/ }).fill('Keep my local edit');
 	await dialog.getByRole('button', { name: 'Save new revision' }).click();
 	await expect(dialog.getByRole('alert')).toContainText('newer revision');
-	await expect(dialog.getByLabel('Instructions')).toHaveValue(
+	await expect(dialog.getByRole('textbox', { name: /^Instructions/ })).toHaveValue(
 		'Keep my local edit',
 	);
 	await page.keyboard.press('Escape');
@@ -107,7 +107,7 @@ test('create prompts, preserve revisions, filter types and recover from stale ed
 	await page
 		.getByRole('button', { name: 'Manage evaluation prompt' })
 		.click();
-	await expect(dialog.getByLabel('Instructions')).toHaveValue(
+	await expect(dialog.getByRole('textbox', { name: /^Instructions/ })).toHaveValue(
 		'Instructions',
 	);
 	await page.screenshot({

@@ -1,3 +1,4 @@
+import { Agents } from '@/components/agents/agents';
 import { Prompts } from '@/components/prompts/prompts';
 import { Tools } from '@/components/tools/tools';
 import { McpServers } from '@/components/mcp-servers/mcp-servers';
@@ -183,6 +184,7 @@ export function SectionView({
 	project: Project;
 	section: Section;
 }) {
+	if (section === 'agents') return <Agents key={project.id} project={project} />;
 	if (section === 'prompts')
 		return <Prompts key={project.id} project={project} />;
 	if (section === 'tools')

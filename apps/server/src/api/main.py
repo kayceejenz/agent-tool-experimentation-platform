@@ -1,3 +1,6 @@
+from modules.agents.controllers.agent_controller import router as agents_router
+from modules.agents.models.error_model import AgentError
+from modules.agents.repos.agent_repo import AgentRepository
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Literal
@@ -88,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 config.login_rate_limit,
                 config.login_rate_window_seconds,
             )
+        instance.state.agents = AgentRepository(database)
         instance.state.prompts = PromptRepository(database)
         instance.state.database = database
         instance.state.projects = ProjectService(ProjectRepository(database))
@@ -116,7 +120,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     instance.include_router(mcp_router, prefix="/api/v1")
     instance.include_router(tools_router, prefix="/api/v1")
     instance.include_router(prompts_router, prefix="/api/v1")
+    instance.include_router(agents_router, prefix="/api/v1")
 
+    @instance.exception_handler(AgentError)
     @instance.exception_handler(PromptError)
     @instance.exception_handler(McpConnectionError)
     async def mcp_failure(request: Request, error: McpConnectionError):
