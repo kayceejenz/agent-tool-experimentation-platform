@@ -5,10 +5,12 @@ import { projectRequest } from '@/lib/projects/client';
 import type { Project } from '@/types/workspace';
 import type { AgentPage, AgentSummary } from '@/types/agent';
 import { AgentEditor } from './agent-editor';
+import { AgentPlayground } from './agent-playground';
 export function Agents({ project }: { project: Project }) {
 	const [selection, setSelection] = useState<AgentSummary | 'new' | null>(null),
 		[generation, setGeneration] = useState(0);
 	const opener = useRef<HTMLElement | null>(null);
+	const [playground, setPlayground] = useState<AgentSummary | null>(null);
 	return (
 		<>
 			<ProjectSync project={project} />
@@ -34,8 +36,7 @@ export function Agents({ project }: { project: Project }) {
 			<section className="panel">
 				<div className="prompt-toolbar">
 					<p className="mcp-meta">
-						Configuration only. Model execution and the playground are coming in
-						the next increment.
+						Run configured agents and inspect their model turns and tool calls.
 					</p>
 					<button
 						className="button"
@@ -47,12 +48,14 @@ export function Agents({ project }: { project: Project }) {
 				<AgentList
 					key={generation}
 					projectId={project.id}
+					onPlayground={(agent, button) => { opener.current = button; setPlayground(agent); }}
 					onSelect={(agent, button) => {
 						opener.current = button;
 						setSelection(agent);
 					}}
 				/>
 			</section>
+			{playground && <AgentPlayground projectId={project.id} agent={playground} canRun={project.role !== 'viewer'} onClose={() => { setPlayground(null); requestAnimationFrame(() => opener.current?.focus()); }} />}
 			{selection && (
 				<AgentEditor
 					projectId={project.id}
@@ -77,9 +80,11 @@ export function Agents({ project }: { project: Project }) {
 function AgentList({
 	projectId,
 	onSelect,
+	onPlayground,
 }: {
 	projectId: string;
 	onSelect: (agent: AgentSummary, button: HTMLElement) => void;
+	onPlayground: (agent: AgentSummary, button: HTMLElement) => void;
 }) {
 	const [items, setItems] = useState<AgentSummary[]>([]),
 		[offset, setOffset] = useState<number | null>(null),
@@ -180,6 +185,7 @@ function AgentList({
 											>
 												Manage
 											</button>
+											<button className="button" aria-label={`Playground ${agent.name}`} onClick={(e) => onPlayground(agent, e.currentTarget)}>Playground</button>
 										</td>
 									</tr>
 								))}

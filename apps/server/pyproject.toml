@@ -20,11 +20,14 @@ dependencies = [
   "mcp>=1.26,<2",
   "httpx>=0.28,<1",
   "jsonschema>=4.23,<5",
+  "langchain>=1,<2",
+  "langchain-openai>=1,<2",
 ]
 
 [project.scripts]
 agent-platform-api = "api.main:run"
 agent-platform-migrate = "migrations:main"
+agent-platform-worker = "modules.executions.services.worker:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/api", "src/core", "src/integrations", "src/migrations", "src/modules"]

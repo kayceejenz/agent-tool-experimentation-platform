@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import time
@@ -97,6 +98,7 @@ class ToolService:
         # Persist the reservation before dispatch; retries with the same ID cannot invoke twice.
         started = time.monotonic()
         result, error_code = None, None
+        interrupted = False
         try:
             result = redact(
                 await execute_tool(
@@ -108,12 +110,19 @@ class ToolService:
         except ProbeFailure as error:
             # A timeout/disconnect may occur after a remote write completed.
             status, error_code = "unknown", error.code
+        except asyncio.CancelledError:
+            status, error_code, interrupted = "unknown", "interrupted", True
+        except Exception:
+            status, error_code = "unknown", "executor_error"
         duration = int((time.monotonic() - started) * 1000)
         async with self.repository.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
-                return await (
+                saved = await (
                     await db.execute(
                         "UPDATE agent_platform.tool_executions SET status=%s,result=%s,error_code=%s,duration_ms=%s WHERE id=%s RETURNING id,revision,inputs,status,result,error_code,duration_ms,created_at",
                         (status, Jsonb(result), error_code, duration, execution_id),
                     )
                 ).fetchone()
+        if interrupted:
+            raise asyncio.CancelledError
+        return saved

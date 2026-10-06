@@ -154,7 +154,7 @@ class AgentRepository:
             tools=tools,
             configuration_issues=issues,
             configuration_ready=not issues,
-            runtime_available=False,
+            runtime_available=row["model_settings"]["provider"].lower() == "openai",
         )
         return result
 

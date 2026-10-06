@@ -172,7 +172,7 @@ import { AgentHistory } from './agent-history';
 			apply(saved);
 			setNotice(
 				saved.enabled
-					? 'Agent enabled. Execution is not available yet.'
+					? 'Agent enabled. Open its playground to run a task.'
 					: 'Agent disabled.',
 			);
 			onSaved();
@@ -452,7 +452,7 @@ import { AgentHistory } from './agent-history';
 						{(managing ? tab === 'Limits' : step === 4) && (
 							<>
 								<p className="mcp-note">
-									These budgets will be enforced by the future runtime. Zero
+									These budgets are enforced during execution. Zero
 									tool calls permits an agent that only answers using its
 									instructions.
 								</p>

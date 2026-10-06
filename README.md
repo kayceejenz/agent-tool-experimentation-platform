@@ -16,6 +16,16 @@ cp -n .env.example .env
 uv run --locked agent-platform-api
 ```
 
+### Execution worker
+
+In a separate terminal, from the repository root:
+
+```sh
+cd apps/server
+uv sync --locked
+uv run --locked agent-platform-worker
+```
+
 ### Database migrations
 
 From `apps/server`:
