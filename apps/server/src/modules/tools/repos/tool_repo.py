@@ -63,15 +63,15 @@ class ToolRepository:
             raise McpConnectionError(404, "Tool not found")
         return row
 
-    async def list(self, user_id, project_id, server_id, offset):
+    async def list(self, user_id, project_id, server_id, offset, query="", summary=False):
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
                 await ServerRepository.member(db, user_id, project_id, False)
                 rows = await (
                     await db.execute(
-                        SELECT
-                        + " WHERE s.project_id=%s AND (%s::uuid IS NULL OR s.id=%s) ORDER BY s.name,t.name,t.id LIMIT 101 OFFSET %s",
-                        (project_id, server_id, server_id, offset),
+                        (SELECT.replace("r.definition", "r.definition->>'description' AS description") if summary else SELECT)
+                        + " WHERE s.project_id=%s AND (%s::uuid IS NULL OR s.id=%s) AND strpos(lower(t.name),lower(%s))>0 ORDER BY s.name,t.name,t.id LIMIT 101 OFFSET %s",
+                        (project_id, server_id, server_id, query, offset),
                     )
                 ).fetchall()
                 return {
@@ -117,3 +117,22 @@ class ToolRepository:
                     ):
                         row.update(status="unknown", error_code="interrupted")
                 return {"items": rows}
+
+    async def operation(self, user_id, project_id, tool_id, request_id):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await ServerRepository.member(db, user_id, project_id, False)
+                await self.read(db, project_id, tool_id)
+                row = await (await db.execute(
+                    "SELECT id,revision,inputs,status,result,error_code,duration_ms,created_at FROM agent_platform.tool_executions WHERE tool_id=%s AND user_id=%s AND request_id=%s",
+                    (tool_id, user_id, request_id),
+                )).fetchone()
+                if not row:
+                    raise McpConnectionError(404, "Tool operation not found")
+                return row
+
+    async def get(self, user_id, project_id, tool_id):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await ServerRepository.member(db, user_id, project_id, False)
+                return await self.read(db, project_id, tool_id)

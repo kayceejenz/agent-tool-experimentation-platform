@@ -390,3 +390,66 @@ def test_tool_schema_size_counts_toward_context_guard():
     asyncio.run(runtime.execute(run))
     assert repo.result["reason"] == "context_limit"
     assert model.index == 0 and not executor.calls
+
+
+def test_react_ten_sequential_actions_observe_results_and_preserve_lineage():
+    from modules.agents.dtos.agent_dto import Limits
+    responses = [call(f'tool_{i % 3}', f'step-{i}') for i in range(10)]
+    run, model, repo, executor = execute(
+        [*responses, AIMessage(content='Verified all three products.')],
+        tools=3, limits=Limits().model_dump(),
+    )
+    assert repo.result['status'] == 'completed'
+    assert len(executor.calls) == 10 and model.index == 11
+    turns = [span for span in repo.spans if span['kind'] == 'model']
+    tools = [span for span in repo.spans if span['kind'] == 'tool']
+    for i, span in enumerate(tools):
+        assert span['parent_id'] == turns[i]['id']
+        assert turns[i + 1]['context_span_ids'] == [s['id'] for s in tools[:i + 1]]
+        assert model.observed[i + 1][-1].tool_call_id == f'step-{i}'
+    system = model.observed[0][0].content
+    assert 'Execution policy:' in system
+    assert 'Call one tool at a time' in system
+    assert '16 model turns' in system and '20 tool calls' in system
+    assert run['snapshot']['system_prompt']['content'] in system
+    assert run['snapshot']['agent_prompt']['content'] in system
+    assert turns[-1]['inputs']['strategy'] == 'react'
+    assert turns[-1]['inputs']['remaining_tool_calls'] == 10
+
+
+def test_existing_saved_limits_are_used_by_react_policy():
+    from integrations.agents.langchain_runtime import runtime_instructions
+    run, _, _, _, _ = fixture([])
+    assert '8 model turns' in runtime_instructions(run['snapshot'])
+    assert '10 tool calls' in runtime_instructions(run['snapshot'])
+
+
+def test_react_dependent_action_uses_observed_tool_result():
+    import json
+
+    class ObservationDrivenModel(ScriptedModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            self.observed.append(messages)
+            if self.index == 0:
+                response = call()
+            elif self.index == 1:
+                observation = json.loads(messages[-1].content)
+                response = AIMessage(content='', tool_calls=[{
+                    'name': 'tool_1', 'id': 'dependent-call', 'type': 'tool_call',
+                    'args': {'sku': observation['result']['sku']},
+                }])
+            else:
+                observation = json.loads(messages[-1].content)
+                response = AIMessage(content=f"Verified price: {observation['result']['price']}")
+            self.index += 1
+            return ChatResult(generations=[ChatGeneration(message=response)])
+
+    run, _, repo, executor, _ = fixture([], outcomes=[
+        dict(status='success', result={'sku': 'DISCOVERED-SKU'}, error_code=None),
+        dict(status='success', result={'price': 29}, error_code=None),
+    ])
+    model = ObservationDrivenModel(responses=[])
+    runtime = LangChainRuntime(repo, executor, Settings(_env_file=None), lambda _: model)
+    asyncio.run(runtime.execute(run))
+    assert executor.calls[1][1].arguments == {'sku': 'DISCOVERED-SKU'}
+    assert repo.result == dict(status='completed', reason='final_answer', answer='Verified price: 29')

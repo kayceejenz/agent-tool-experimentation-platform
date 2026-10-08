@@ -1,0 +1,605 @@
+.root {
+	margin: auto;
+	padding: 0;
+	max-width: none;
+	max-height: calc(100dvh - 48px);
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	background: var(--panel);
+	color: var(--foreground);
+	box-shadow: 0 24px 80px rgb(15 23 42 / 0.2);
+	overflow: hidden;
+}
+.root[open] {
+	display: flex;
+	flex-direction: column;
+}
+.root::backdrop {
+	background: rgb(0 0 0 / 0.45);
+}
+.root :global(.playground-header) {
+	border-bottom: 1px solid var(--line);
+}
+.root {
+	width: min(920px, calc(100vw - 48px));
+	height: min(680px, calc(100dvh - 48px));
+}
+.root :global(.playground-header) {
+	padding: 20px 28px;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto 34px;
+	gap: 16px;
+	align-items: center;
+	flex-shrink: 0;
+}
+.root :global(.playground-header h2) {
+	margin: 6px 0 0;
+	font-size: 22px;
+	line-height: 1.3;
+}
+.root :global(.playground-heading) {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.root :global(.playground-subtitle) {
+	margin: 6px 0 0;
+	font-size: 12px;
+	color: var(--muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.root :global(.playground-header-actions),
+.root :global(.playground-run-actions) {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.root :global(.playground-header-actions .button),
+.root :global(.execution-actions .button) {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+}
+.root :global(.playground-close) {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+}
+.root :global(.playground-close:hover) {
+	background: var(--background);
+	color: var(--foreground);
+}
+.root :global(.playground-close:focus-visible),
+.root :global(.playground-text-button:focus-visible),
+.root :global(.playground-back:focus-visible) {
+	outline: 2px solid var(--accent);
+	outline-offset: 3px;
+}
+.root :global(.playground-body) {
+	padding: 0;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+.root :global(.playground-composer) {
+	max-width: 720px;
+	margin: 0 auto;
+	padding: 40px 32px;
+	width: 100%;
+}
+.root :global(.playground-intro) {
+	margin-bottom: 32px;
+}
+.root :global(.playground-intro h3) {
+	margin: 0 0 10px;
+	font-size: 26px;
+	font-weight: 500;
+	letter-spacing: -0.5px;
+}
+.root :global(.playground-intro p) {
+	margin: 0;
+	color: var(--muted);
+	font-size: 14px;
+	line-height: 1.7;
+}
+.root :global(.playground-task-label) {
+	display: block;
+	margin-bottom: 10px;
+	font-size: 13px;
+	font-weight: 500;
+}
+.root :global(.playground-input-box) {
+	border: 1px solid var(--line);
+	border-radius: 14px;
+	padding: 16px;
+}
+.root :global(.playground-input-box:focus-within) {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.root :global(.playground-input-box textarea) {
+	display: block;
+	width: 100%;
+	min-height: 140px;
+	max-height: 320px;
+	resize: vertical;
+	border: 0;
+	outline: none;
+	background: transparent;
+	color: var(--foreground);
+	font: inherit;
+	font-size: 15px;
+	line-height: 1.7;
+}
+.root :global(.playground-input-box textarea::placeholder) {
+	color: var(--muted);
+	opacity: 0.75;
+}
+.root :global(.execution-actions) {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-top: 14px;
+}
+.root :global(.execution-actions > span) {
+	color: var(--muted);
+	font-size: 12px;
+}
+.root :global(.playground-results) {
+	max-width: 760px;
+	width: 100%;
+	margin: 0 auto;
+	padding: 28px 32px;
+	overflow-wrap: anywhere;
+}
+.root :global(.playground-task-message) {
+	padding: 18px 20px;
+	border-radius: 12px;
+	background: var(--background);
+	margin-bottom: 24px;
+}
+.root :global(.playground-task-preview) {
+	display: -webkit-box;
+	-webkit-line-clamp: 4;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.root :global(.playground-message-label) {
+	font-size: 12px;
+	color: var(--muted);
+}
+.root :global(.playground-task-message p) {
+	margin: 8px 0 0;
+	white-space: pre-wrap;
+	line-height: 1.7;
+	font-size: 14px;
+}
+.root :global(.playground-text-button) {
+	border: 0;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	font-size: 12px;
+	padding: 0;
+	margin: 12px 16px 0 0;
+	cursor: pointer;
+}
+.root :global(.playground-text-button:hover) {
+	color: var(--foreground);
+}
+.root :global(.playground-copy) {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+.root :global(.playground-copy:hover) {
+	background: var(--background);
+	color: var(--foreground);
+}
+.root :global(.playground-copy:focus-visible) {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+.root :global(.playground-run-heading) {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 20px;
+}
+.root :global(.playground-run-heading h3),
+.root :global(.playground-section-heading h3) {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 500;
+}
+.root :global(.execution-answer p) {
+	margin: 0;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	line-height: 1.85;
+	font-size: 15px;
+}
+.root :global(.execution-status) {
+	font-size: 11px;
+	text-transform: capitalize;
+	border: 1px solid var(--line);
+	border-radius: 20px;
+	padding: 4px 9px;
+	white-space: nowrap;
+	line-height: 1.3;
+	color: var(--muted);
+}
+.root :global(.status-completed),
+.root :global(.status-success) {
+	color: var(--accent);
+}
+.root :global(.status-failed),
+.root :global(.status-error),
+.root :global(.status-invalid),
+.root :global(.status-blocked) {
+	color: var(--warning);
+}
+.root :global(.playground-working) {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 20px 0;
+}
+.root :global(.playground-working p) {
+	margin: 0 0 6px;
+	font-size: 14px;
+}
+.root :global(.playground-working small) {
+	color: var(--muted);
+	font-size: 12px;
+	line-height: 1.7;
+}
+.root :global(.playground-progress) {
+	flex-shrink: 0;
+	height: 20px;
+	width: 20px;
+	border: 2px solid var(--line);
+	border-top-color: var(--accent);
+	border-radius: 50%;
+	animation: playground-spin 1s linear infinite;
+}
+@keyframes playground-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+.root :global(.playground-feedback) {
+	padding: 14px 24px;
+	margin: 0;
+	background: var(--background);
+	font-size: 13px;
+	line-height: 1.7;
+}
+.root :global(.playground-outcome h4) {
+	margin: 0 0 10px;
+	font-size: 16px;
+	font-weight: 500;
+}
+.root :global(.playground-outcome p) {
+	color: var(--muted);
+	line-height: 1.7;
+	font-size: 14px;
+}
+.root :global(.playground-reason) {
+	display: block;
+	color: var(--muted);
+	font-size: 12px;
+}
+.root :global(.playground-details) {
+	border-top: 1px solid var(--line);
+	margin-top: 32px;
+	padding-top: 18px;
+}
+.root :global(.playground-details > summary) {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	font-size: 13px;
+	cursor: pointer;
+	list-style: none;
+}
+.root :global(.playground-details > summary::before) {
+	content: '›';
+	font-size: 18px;
+	color: var(--muted);
+}
+.root :global(.playground-details[open] > summary::before) {
+	transform: rotate(90deg);
+}
+.root :global(.playground-details > summary > span) {
+	color: var(--muted);
+	font-size: 12px;
+	margin-left: auto;
+}
+.root :global(.playground-detail-content) {
+	padding-top: 20px;
+}
+.root :global(.playground-trace-note) {
+	margin: 0 0 16px;
+	font-size: 12px;
+	color: var(--muted);
+	line-height: 1.7;
+}
+.root :global(.execution-span) {
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	margin: 10px 0;
+	overflow-wrap: anywhere;
+	scroll-margin-top: 12px;
+}
+.root :global(.execution-span > summary) {
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 14px;
+	list-style: none;
+}
+.root :global(.execution-span > summary::after) {
+	content: '+';
+	color: var(--muted);
+	margin-left: auto;
+}
+.root :global(.execution-span[open] > summary::after) {
+	content: '−';
+}
+.root :global(.execution-span summary strong) {
+	font-size: 13px;
+	font-weight: 500;
+}
+.root :global(.execution-span summary small) {
+	font-size: 11px;
+	color: var(--muted);
+	white-space: nowrap;
+}
+.root :global(.trace-step-number) {
+	flex-shrink: 0;
+	display: grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 6px;
+	background: var(--background);
+	font-size: 11px;
+	color: var(--muted);
+}
+.root :global(.trace-model) {
+	color: var(--accent);
+}
+.root :global(.trace-step-content) {
+	border-top: 1px solid var(--line);
+	padding: 16px;
+}
+.root :global(.execution-children) {
+	margin-left: 20px;
+	padding-left: 12px;
+	border-left: 2px solid var(--line);
+}
+.root :global(.trace-payloads) {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 16px;
+}
+.root :global(.trace-payloads h4),
+.root :global(.playground-configuration h4) {
+	font-size: 12px;
+	font-weight: 500;
+	margin: 0 0 10px;
+}
+.root :global(.execution-span pre),
+.root :global(.playground-configuration pre) {
+	margin: 0;
+	padding: 14px;
+	border-radius: 6px;
+	background: var(--background);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	max-height: 280px;
+	overflow: auto;
+	font: 12px/1.7 monospace;
+}
+.root :global(.playground-configuration pre) {
+	max-height: none;
+	margin-top: 20px;
+}
+.root :global(.trace-context) {
+	font-size: 12px;
+	margin-bottom: 18px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.root :global(.trace-context span) {
+	color: var(--muted);
+}
+.root :global(.trace-identifiers) {
+	margin-top: 18px;
+	font-size: 12px;
+	color: var(--muted);
+}
+.root :global(.trace-identifiers summary) {
+	cursor: pointer;
+}
+.root :global(.trace-identifiers dl) {
+	display: grid;
+	grid-template-columns: 90px minmax(0, 1fr);
+	gap: 10px;
+}
+.root :global(.trace-identifiers dd) {
+	margin: 0;
+}
+.root :global(.playground-configuration) {
+	margin-top: 24px;
+	font-size: 12px;
+	color: var(--muted);
+}
+.root :global(.playground-configuration > summary) {
+	cursor: pointer;
+}
+.root :global(.playground-history) {
+	max-width: 760px;
+	width: 100%;
+	margin: 0 auto;
+	padding: 28px 32px;
+}
+.root :global(.playground-back) {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 0;
+	margin-bottom: 28px;
+	border: 0;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+.root :global(.playground-history .playground-section-heading) {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
+	margin-bottom: 20px;
+}
+.root :global(.execution-history) {
+	list-style: none;
+	padding: 0;
+	margin: 0 0 20px;
+}
+.root :global(.execution-history button) {
+	width: 100%;
+	text-align: left;
+	padding: 18px 0;
+	border: 0;
+	border-bottom: 1px solid var(--line);
+	background: transparent;
+	color: var(--foreground);
+	font: inherit;
+	cursor: pointer;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 8px 16px;
+	align-items: center;
+}
+.root :global(.execution-history button:hover .history-task) {
+	color: var(--accent);
+}
+.root :global(.history-task) {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 14px;
+}
+.root :global(.execution-history small) {
+	grid-column: 1 / 3;
+	color: var(--muted);
+	font-size: 12px;
+}
+.root :global(.playground-empty) {
+	text-align: center;
+	padding: 48px 20px;
+}
+.root :global(.playground-empty h4) {
+	font-size: 16px;
+	font-weight: 500;
+}
+.root :global(.playground-empty p) {
+	color: var(--muted);
+	font-size: 14px;
+}
+@media (max-width: 760px) {
+	.root {
+		width: calc(100vw - 24px);
+		height: calc(100dvh - 24px);
+		max-height: calc(100dvh - 24px);
+	}
+	.root :global(.playground-header) {
+		padding: 16px 18px;
+		grid-template-columns: minmax(0, 1fr) 34px;
+		gap: 12px;
+	}
+	.root :global(.playground-header h2) {
+		font-size: 20px;
+	}
+	.root :global(.playground-header-actions) {
+		grid-column: 1 / -1;
+		grid-row: 2;
+		gap: 8px;
+	}
+	.root :global(.playground-close) {
+		grid-column: 2;
+		grid-row: 1;
+		align-self: start;
+	}
+	.root :global(.playground-run-actions) {
+		gap: 6px;
+	}
+	.root :global(.playground-header-actions .button) {
+		padding: 7px 10px;
+		font-size: 12px;
+	}
+	.root :global(.playground-composer) {
+		padding: 28px 20px;
+	}
+	.root :global(.playground-intro h3) {
+		font-size: 23px;
+	}
+	.root :global(.playground-results),
+	.root :global(.playground-history) {
+		padding: 24px 20px;
+	}
+	.root :global(.execution-actions > span) {
+		display: none;
+	}
+	.root :global(.eyebrow) {
+		margin-top: 0;
+	}
+	.root :global(.execution-actions) {
+		justify-content: flex-end;
+	}
+	.root :global(.playground-details > summary > span) {
+		margin-left: 22px;
+		flex-basis: 100%;
+	}
+	.root :global(.trace-payloads) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.root :global(.execution-span > summary) {
+		flex-wrap: wrap;
+	}
+	.root :global(.execution-children) {
+		margin-left: 8px;
+		padding-left: 8px;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.root :global(.playground-progress) {
+		animation: none;
+	}
+}

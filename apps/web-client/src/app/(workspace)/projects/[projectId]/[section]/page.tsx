@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { isSection } from '@/lib/workspace';
 import { getProject } from '@/lib/projects/server';
-import { SectionView } from '@/components/workspace/workspace-views';
+import { SectionView } from '@/components/workspace/section-view';
 
 export default async function Page({
 	params,

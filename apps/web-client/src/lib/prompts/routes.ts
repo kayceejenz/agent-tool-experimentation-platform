@@ -1,8 +1,12 @@
 import 'server-only';
-import { AuthError, checkOrigin, json } from '@/lib/auth/server';
-import { ProjectApiError, projectApi } from '@/lib/projects/server';
-
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { BODY_LIMITS } from '@/lib/http/request-body';
+import { json } from '@/lib/auth/server';
+import { projectApi } from '@/lib/projects/server';
+import {
+	routeError,
+	readRouteJson,
+	uuidPattern as uuid,
+} from '@/lib/http/project-route';
 
 export async function promptRoute(
 	request: Request,
@@ -23,29 +27,16 @@ export async function promptRoute(
 		if (request.method === 'GET') {
 			const incoming = new URL(request.url).searchParams,
 				params = new URLSearchParams();
-			for (const key of ['offset', 'type'])
+			for (const key of ['offset', 'type', 'q'])
 				if (incoming.has(key))
 					params.set(key, incoming.get(key)!);
 			path += `?${params}`;
 		} else {
-			checkOrigin(request);
-			if (
-				!request.headers
-					.get('content-type')
-					?.startsWith('application/json')
-			)
-				return json({ error: 'Send JSON data.' }, 415);
-			const raw = await request.text();
-			if (raw.length > 220000)
-				return json(
-					{ error: 'Prompt is too large.' },
-					413,
-				);
-			try {
-				init.body = JSON.stringify(JSON.parse(raw));
-			} catch {
-				return json({ error: 'Invalid JSON.' }, 400);
-			}
+			init.body = await readRouteJson(
+				request,
+				BODY_LIMITS.configuration,
+				'Send JSON data.',
+			);
 		}
 		return json(
 			await projectApi(path, init, {
@@ -58,14 +49,9 @@ export async function promptRoute(
 			request.method === 'POST' && !promptId ? 201 : 200,
 		);
 	} catch (error) {
-		if (
-			error instanceof ProjectApiError ||
-			error instanceof AuthError
-		)
-			return json({ error: error.message }, error.status);
-		return json(
-			{ error: 'Prompts are temporarily unavailable.' },
-			503,
+		return routeError(
+			error,
+			'Prompts are temporarily unavailable.',
 		);
 	}
 }

@@ -1,7 +1,8 @@
 import asyncio
+
 import pytest
-from modules.tools.helpers.validation import validate_arguments, redact
 from modules.mcp_servers.models.error_model import McpConnectionError
+from modules.tools.helpers.validation import redact, validate_arguments
 
 
 def test_local_references_work_but_external_references_are_rejected():

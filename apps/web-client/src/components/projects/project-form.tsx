@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { Project } from '@/types/workspace';
-import { projectRequest, ProjectRequestError } from '@/lib/projects/client';
+import { ProjectRequestError } from '@/lib/projects/client';
 import { useProjects } from './project-provider';
+import { projectWrite } from '@/lib/projects/client';
 
 export function ProjectForm({ project }: { project?: Project }) {
 	const router = useRouter();
@@ -19,11 +20,10 @@ export function ProjectForm({ project }: { project?: Project }) {
 	const [denied, setDenied] = useState(false);
 	const readOnly = project?.role === 'viewer' || denied;
 
-
 	async function submit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		if (busy || readOnly) return;
-		if (!name.trim()) {
+		if(busy || readOnly) return;
+		if(!name.trim()) {
 			setError('Enter a project name.');
 			return;
 		}
@@ -31,39 +31,29 @@ export function ProjectForm({ project }: { project?: Project }) {
 		setError('');
 		setSaved(false);
 		try {
-			const result = await projectRequest<Project>(
-				project ? `/${project.id}` : '',
-				{
-					method: project ? 'PATCH' : 'POST',
-					headers: {
-						'Content-Type':
-							'application/json',
-					},
-					body: JSON.stringify({
-						name: name.trim(),
-						description:
-							description.trim() ||
-							null,
-					}),
-				},
-			);
+			const result = await projectWrite<Project>(project ? `/${project.id}` : '', project ? 'PATCH' : 'POST', {
+				name: name.trim(),
+				description:
+					description.trim() ||
+					null,
+			});
 			upsert(result);
 			setName(result.name);
 			setDescription(result.description ?? '');
-			if (project) {
+			if(project) {
 				setSaved(true);
 				router.refresh();
 			} else {
 				router.push(`/projects/${result.id}`);
 				router.refresh();
 			}
-		} catch (error) {
+		} catch(error) {
 			setError(
 				error instanceof Error
 					? error.message
 					: 'Unable to save this project.',
 			);
-			if (
+			if(
 				error instanceof ProjectRequestError &&
 				(error.status === 403 || error.status === 404)
 			)

@@ -3,8 +3,6 @@ import socket
 
 import httpx
 import pytest
-from mcp.server.fastmcp import FastMCP
-
 from core.settings import Settings
 from integrations.mcp.client import (
     LimitedStream,
@@ -13,6 +11,7 @@ from integrations.mcp.client import (
     probe,
     resolve_endpoint,
 )
+from mcp.server.fastmcp import FastMCP
 
 
 def settings():

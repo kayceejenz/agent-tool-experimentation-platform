@@ -105,18 +105,28 @@ class ExecutionRepository:
                     )
                 ).fetchone()
 
-    async def get(self, user_id, project_id, execution_id):
+    async def get(self, user_id, project_id, execution_id, view="full"):
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
                 await AgentRepository.member(db, user_id, project_id)
                 row = await (
                     await db.execute(
-                        "SELECT * FROM agent_platform.agent_executions WHERE project_id=%s AND id=%s",
+                        ("SELECT *" if view == "full" else "SELECT id,agent_revision,status,termination_reason,final_answer,created_at,finished_at" + (",input" if view == "summary" else "")) + " FROM agent_platform.agent_executions WHERE project_id=%s AND id=%s",
                         (project_id, execution_id),
                     )
                 ).fetchone()
                 if not row:
                     raise AgentError(404, "Execution not found")
+                if view != "full":
+                    counts = await (await db.execute(
+                        "SELECT count(*) FILTER(WHERE kind='model') AS model_turns,count(*) FILTER(WHERE kind='tool') AS tool_calls FROM agent_platform.execution_spans WHERE execution_id=%s",
+                        (execution_id,),
+                    )).fetchone()
+                    hint = await (await db.execute(
+                        "SELECT outputs->>'hint' AS hint FROM agent_platform.execution_spans WHERE execution_id=%s AND error_code IS NOT NULL ORDER BY sequence LIMIT 1",
+                        (execution_id,),
+                    )).fetchone()
+                    return {**row, **counts, "failure_hint": hint["hint"] if hint else None}
                 row.pop("input_hash", None)
                 row["spans"] = await (
                     await db.execute(
@@ -142,7 +152,7 @@ class ExecutionRepository:
                     "next_offset": offset + 20 if len(rows) > 20 else None,
                 }
 
-    async def cancel(self, user_id, project_id, execution_id):
+    async def cancel(self, user_id, project_id, execution_id, view="full"):
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
                 await AgentRepository.member(db, user_id, project_id, True)
@@ -154,7 +164,7 @@ class ExecutionRepository:
                 ).fetchone()
                 if not row:
                     raise AgentError(404, "Execution not found")
-        return await self.get(user_id, project_id, execution_id)
+        return await self.get(user_id, project_id, execution_id, view)
 
     async def claim(self):
         async with self.database.connection() as conn:
@@ -263,3 +273,29 @@ class ExecutionRepository:
                 "UPDATE agent_platform.agent_executions SET status=%s,termination_reason=%s,final_answer=%s,finished_at=now() WHERE id=%s AND status='running'",
                 (status, reason, self.safe(answer), run_id),
             )
+
+    async def trace(self, user_id, project_id, execution_id, offset=0, span_id=None, snapshot=False):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await AgentRepository.member(db, user_id, project_id)
+                execution = await (await db.execute(
+                    "SELECT id" + (",snapshot" if snapshot else "") + " FROM agent_platform.agent_executions WHERE project_id=%s AND id=%s",
+                    (project_id, execution_id),
+                )).fetchone()
+                if not execution:
+                    raise AgentError(404, "Execution not found")
+                if snapshot:
+                    return {"snapshot": execution["snapshot"]}
+                if span_id is not None:
+                    row = await (await db.execute(
+                        "SELECT * FROM agent_platform.execution_spans WHERE execution_id=%s AND id=%s",
+                        (execution_id, span_id),
+                    )).fetchone()
+                    if not row:
+                        raise AgentError(404, "Execution step not found")
+                    return row
+                rows = await (await db.execute(
+                    "SELECT id,sequence,parent_id,kind,name,status,call_id,tool_id,tool_revision,tool_execution_id,context_span_ids,error_code,duration_ms FROM agent_platform.execution_spans WHERE execution_id=%s ORDER BY sequence LIMIT 51 OFFSET %s",
+                    (execution_id, offset),
+                )).fetchall()
+                return {"items": rows[:50], "next_offset": offset + 50 if len(rows) > 50 else None}

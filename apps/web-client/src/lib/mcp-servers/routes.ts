@@ -1,6 +1,12 @@
 import 'server-only';
-import { AuthError, checkOrigin, json } from '@/lib/auth/server';
-import { ProjectApiError, projectApi } from '@/lib/projects/server';
+import { BODY_LIMITS } from '@/lib/http/request-body';
+import { json } from '@/lib/auth/server';
+import { projectApi } from '@/lib/projects/server';
+import {
+	routeError,
+	readRouteJson,
+	uuidPattern as uuid,
+} from '@/lib/http/project-route';
 
 const messages = {
 	403: 'You no longer have permission to manage MCP connections.',
@@ -9,7 +15,6 @@ const messages = {
 	422: 'Check the name, endpoint, and authentication. Changing a bearer-authenticated endpoint requires a new token.',
 	503: 'Unable to save or load connections. The server or credential storage is unavailable. Please try again.',
 };
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function mcpRoute(
 	request: Request,
@@ -37,42 +42,20 @@ export async function mcpRoute(
 			if (cursor) params.set('cursor', cursor);
 			path += `?${params}`;
 		} else if (request.method !== 'GET') {
-			checkOrigin(request);
-			if (
-				!request.headers
-					.get('content-type')
-					?.startsWith('application/json')
-			) {
-				return json(
-					{ error: 'Send JSON form data.' },
-					415,
-				);
-			}
-			try {
-				init.body = JSON.stringify(
-					await request.json(),
-				);
-			} catch {
-				return json(
-					{ error: 'Invalid connection data.' },
-					400,
-				);
-			}
+			init.body = await readRouteJson(
+				request,
+				BODY_LIMITS.mcp,
+				'Send JSON form data.',
+			);
 		}
 		return json(
 			await projectApi(path, init, messages),
 			request.method === 'POST' && !action ? 201 : 200,
 		);
 	} catch (error) {
-		if (
-			error instanceof ProjectApiError ||
-			error instanceof AuthError
-		) {
-			return json({ error: error.message }, error.status);
-		}
-		return json(
-			{ error: 'Connections are temporarily unavailable.' },
-			503,
+		return routeError(
+			error,
+			'Connections are temporarily unavailable.',
 		);
 	}
 }

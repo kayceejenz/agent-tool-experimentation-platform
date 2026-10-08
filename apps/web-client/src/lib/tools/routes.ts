@@ -1,9 +1,12 @@
 import 'server-only';
-import { AuthError, checkOrigin, json } from '@/lib/auth/server';
-import { ProjectApiError, projectApi } from '@/lib/projects/server';
-
-
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { BODY_LIMITS } from '@/lib/http/request-body';
+import { json } from '@/lib/auth/server';
+import { projectApi } from '@/lib/projects/server';
+import {
+	routeError,
+	readRouteJson,
+	uuidPattern as uuid,
+} from '@/lib/http/project-route';
 
 export async function toolRoute(
 	request: Request,
@@ -19,29 +22,21 @@ export async function toolRoute(
 		if (request.method === 'GET' && !toolId) {
 			const incoming = new URL(request.url).searchParams;
 			const params = new URLSearchParams();
-			for (const key of ['server_id', 'offset'])
+			for (const key of [
+				'server_id',
+				'offset',
+				'q',
+				'summary',
+			])
 				if (incoming.has(key))
 					params.set(key, incoming.get(key)!);
 			path += `?${params}`;
 		} else if (request.method !== 'GET') {
-			checkOrigin(request);
-			if (
-				!request.headers
-					.get('content-type')
-					?.startsWith('application/json')
-			)
-				return json({ error: 'Send JSON data.' }, 415);
-			const raw = await request.text();
-			if (raw.length > 70000)
-				return json(
-					{ error: 'Inputs exceed 64 KB.' },
-					413,
-				);
-			try {
-				init.body = JSON.stringify(JSON.parse(raw));
-			} catch {
-				return json({ error: 'Invalid JSON.' }, 400);
-			}
+			init.body = await readRouteJson(
+				request,
+				BODY_LIMITS.tool,
+				'Send JSON data.',
+			);
 		}
 		return json(
 			await projectApi(path, init, {
@@ -53,16 +48,30 @@ export async function toolRoute(
 			}),
 		);
 	} catch (error) {
-		if (
-			error instanceof ProjectApiError ||
-			error instanceof AuthError
-		)
-			return json({ error: error.message }, error.status);
+		return routeError(
+			error,
+			'Tools are temporarily unavailable. Check history before running again.',
+		);
+	}
+}
+
+export async function toolOperationRoute(
+	projectId: string,
+	toolId: string,
+	requestId: string,
+) {
+	if (![projectId, toolId, requestId].every(id => uuid.test(id)))
+		return json({ error: 'Operation not found.' }, 404);
+	try {
 		return json(
-			{
-				error: 'Tools are temporarily unavailable. Check history before running again.',
-			},
-			503,
+			await projectApi(
+				`/${projectId}/tools/${toolId}/executions/requests/${requestId}`,
+			),
+		);
+	} catch (error) {
+		return routeError(
+			error,
+			'Unable to check this operation. Please try again.',
 		);
 	}
 }

@@ -14,4 +14,5 @@ export type McpServer = {
 	created_at: string;
 	updated_at: string;
 };
+
 export type McpServerPage = { items: McpServer[]; next_cursor: string | null };

@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
 	testDir: './tests',
+	testIgnore: '**/request-body/**',
 	fullyParallel: true,
 	workers: 2,
 	forbidOnly: Boolean(process.env.CI),

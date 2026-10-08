@@ -1,28 +1,23 @@
 'use client';
 import Link from 'next/link';
-import type { ToolPage } from '@/types/tool';
-import { useEffect, useRef, useState } from 'react';
 import { PlugZap, RefreshCw, Settings2, Wrench, X } from 'lucide-react';
 import type { McpServer } from '@/types/mcp-server';
-import { projectRequest, ProjectRequestError } from '@/lib/projects/client';
 import { ServerForm } from './server-form';
-import { checkErrors } from './check-errors';
+import { useManageServer } from './use-manage-server';
 
 export type DiscoveredTool = {
 	name: string;
 	description: string | null;
 	input_schema: Record<string, unknown>;
 };
-type ProbeResult = {
-	server: McpServer;
-	tools: DiscoveredTool[] | null;
-};
+
 
 const statusLabels: Record<McpServer['connection_status'], string> = {
 	untested: 'Not checked',
 	connected: 'Connected',
 	error: 'Check failed',
 };
+
 
 type Props = {
 	server: McpServer;
@@ -33,6 +28,7 @@ type Props = {
 	onDenied: () => void;
 };
 
+
 export function ManageServer({
 	server: initial,
 	projectId,
@@ -41,208 +37,28 @@ export function ManageServer({
 	onUpdated,
 	onDenied,
 }: Props) {
-	const dialog = useRef<HTMLDialogElement>(null);
-	const [server, setServer] = useState(initial);
-	const [tools, setTools] = useState<DiscoveredTool[] | null>(null);
-	const [operation, setOperation] = useState<
-		'check' | 'discover' | 'toggle' | null
-	>(null);
-	const [editing, setEditing] = useState(false);
-	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState('');
-	const [notice, setNotice] = useState('');
-	const [denied, setDenied] = useState(false);
-	const editButton = useRef<HTMLButtonElement>(null);
-	const editable = canManage && !denied;
-	const busy = operation !== null || saving;
-
-	useEffect(() => {
-		const element = dialog.current;
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = 'hidden';
-		element?.showModal();
-		return () => {
-			element?.close();
-			document.body.style.overflow = previousOverflow;
-		};
-	}, []);
-
-	useEffect(() => {
-		let active = true;
-		void projectRequest<ToolPage>(
-			`/${projectId}/tools?server_id=${initial.id}`,
-		)
-			.then(page => {
-				if (active)
-					setTools(
-						page.items.map(tool => ({
-							name: tool.name,
-							description:
-								tool.definition
-									.description ??
-								null,
-							input_schema:
-								tool.definition
-									.input_schema,
-						})),
-					);
-			})
-			.catch(() => {
-				if (active)
-					setError('Unable to load saved tools.');
-			});
-		return () => {
-			active = false;
-		};
-	}, [projectId, initial.id]);
-
-	function request<T>(path: string, init?: RequestInit) {
-		return projectRequest<T>(
-			`/${projectId}/mcp-servers/${path}`,
-			init,
-		);
-	}
-
-	function apply(next: McpServer) {
-		setServer(next);
-		onUpdated(next);
-	}
-
-	function fail(error: unknown, fallback: string) {
-		setError(error instanceof Error ? error.message : fallback);
-		if (
-			error instanceof ProjectRequestError &&
-			[403, 404].includes(error.status)
-		) {
-			setDenied(true);
-			onDenied();
-		}
-	}
-
-	async function check() {
-		if (busy || !editable) return;
-		setOperation('check');
-		setError('');
-		setNotice('');
-		try {
-			const result = await request<ProbeResult>(
-				`${server.id}/check`,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type':
-							'application/json',
-					},
-					body: '{}',
-				},
-			);
-
-			apply(result.server);
-
-			if (result.server.connection_status === 'error') {
-				setError(
-					checkErrors[
-						result.server.last_error_code ??
-							''
-					] ??
-						'Unable to reach this MCP server. Verify the endpoint and try again.',
-				);
-			} else {
-				setNotice(
-					`${result.server.name} responded successfully.`,
-				);
-			}
-		} catch (error) {
-			fail(error, 'Unable to check this connection.');
-		} finally {
-			setOperation(null);
-		}
-	}
-
-	async function discover() {
-		if (busy || !editable) return;
-		setOperation('discover');
-		setError('');
-		setNotice('');
-
-		try {
-			const result = await request<ProbeResult>(
-				`${server.id}/discover`,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type':
-							'application/json',
-					},
-					body: '{}',
-				},
-			);
-			apply(result.server);
-			if (result.tools !== null) setTools(result.tools);
-			if (result.server.connection_status === 'error') {
-				setError(
-					checkErrors[
-						result.server.last_error_code ??
-							''
-					] ??
-						'Unable to reach this MCP server. Verify the endpoint and try again.',
-				);
-			} else {
-				setNotice(
-					`${result.tools?.length ?? 0} ${
-						result.tools?.length === 1
-							? 'tool'
-							: 'tools'
-					} discovered.`,
-				);
-			}
-		} catch (error) {
-			fail(error, 'Unable to discover tools.');
-		} finally {
-			setOperation(null);
-		}
-	}
-
-	async function toggle() {
-		if (busy || !editable) return;
-		setOperation('toggle');
-		setError('');
-		setNotice('');
-		try {
-			const updated = await request<McpServer>(server.id, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					enabled: !server.enabled,
-				}),
-			});
-			apply(updated);
-			setNotice(
-				`${updated.name} ${
-					updated.enabled ? 'enabled' : 'disabled'
-				}.`,
-			);
-		} catch (error) {
-			fail(error, 'Unable to change availability.');
-		} finally {
-			setOperation(null);
-		}
-	}
-
-	function dismiss() {
-		if (busy) return;
-		if (editing) {
-			setEditing(false);
-			requestAnimationFrame(() =>
-				editButton.current?.focus(),
-			);
-			return;
-		}
-		onClose();
-	}
-
+	const {
+		dialog,
+		server,
+		tools,
+		operation,
+		editing,
+		setEditing,
+		setSaving,
+		error,
+		setError,
+		notice,
+		setNotice,
+		setDenied,
+		editButton,
+		editable,
+		busy,
+		apply,
+		check,
+		discover,
+		toggle,
+		dismiss,
+	} = useManageServer({ server: initial, projectId, canManage, onClose, onUpdated, onDenied });
 	return (
 		<dialog
 			ref={dialog}
@@ -323,8 +139,8 @@ export function ManageServer({
 									className={`mcp-status ${server.connection_status}`}>
 									{
 										statusLabels[
-											server
-												.connection_status
+										server
+											.connection_status
 										]
 									}
 								</span>
@@ -335,9 +151,7 @@ export function ManageServer({
 										Endpoint
 									</dt>
 									<dd className='mcp-sheet-endpoint'>
-										{
-											server.endpoint
-										}
+										{server.endpoint}
 									</dd>
 								</div>
 								<div>
@@ -355,7 +169,7 @@ export function ManageServer({
 									</dt>
 									<dd>
 										{server.auth_type ===
-										'none'
+											'none'
 											? 'None'
 											: `Bearer token · ${server.credential_configured ? 'Configured' : 'Missing'}`}
 									</dd>
@@ -368,12 +182,8 @@ export function ManageServer({
 									<dd>
 										{server.last_checked_at ? (
 											<time
-												dateTime={
-													server.last_checked_at
-												}>
-												{new Date(
-													server.last_checked_at,
-												).toLocaleString()}
+												dateTime={server.last_checked_at}>
+												{new Date(server.last_checked_at).toLocaleString()}
 											</time>
 										) : (
 											'Not checked yet'
@@ -403,22 +213,16 @@ export function ManageServer({
 									className='mcp-toggle'
 									type='button'
 									role='switch'
-									aria-checked={
-										server.enabled
-									}
+									aria-checked={server.enabled}
 									aria-label={`Enable ${server.name}`}
-									disabled={
-										busy
-									}
-									onClick={() =>
-										void toggle()
-									}>
+									disabled={busy}
+									onClick={() => void toggle()}>
 									<span
 										aria-hidden
 									/>
 									<span>
 										{operation ===
-										'toggle'
+											'toggle'
 											? 'Saving…'
 											: server.enabled
 												? 'Enabled'
@@ -440,30 +244,22 @@ export function ManageServer({
 									Tools
 									{tools !==
 										null && (
-										<span className='mcp-tool-count'>
-											{
-												tools.length
-											}
-										</span>
-									)}
+											<span className='mcp-tool-count'>
+												{tools.length}
+											</span>
+										)}
 								</h3>
 								{editable && (
 									<button
 										className='button'
-										disabled={
-											busy
-										}
-										onClick={() =>
-											void discover()
-										}>
+										disabled={busy}
+										onClick={() => void discover()}>
 										<RefreshCw
-											size={
-												15
-											}
+											size={15}
 											aria-hidden
 										/>{' '}
 										{operation ===
-										'discover'
+											'discover'
 											? 'Discovering…'
 											: !tools?.length
 												? 'Discover'
@@ -487,9 +283,7 @@ export function ManageServer({
 							{tools === null ? (
 								<div className='mcp-tools-empty'>
 									<Wrench
-										size={
-											18
-										}
+										size={18}
 										aria-hidden
 									/>
 									<span>
@@ -504,12 +298,10 @@ export function ManageServer({
 									</span>
 								</div>
 							) : tools.length ===
-							  0 ? (
+								0 ? (
 								<div className='mcp-tools-empty'>
 									<Wrench
-										size={
-											18
-										}
+										size={18}
 										aria-hidden
 									/>
 									<span>
@@ -526,20 +318,14 @@ export function ManageServer({
 										tool => (
 											<details
 												className='mcp-tool'
-												key={
-													tool.name
-												}>
+												key={tool.name}>
 												<summary>
 													<Wrench
-														size={
-															14
-														}
+														size={14}
 														aria-hidden
 													/>
 													<span className='mcp-tool-name'>
-														{
-															tool.name
-														}
+														{tool.name}
 													</span>
 												</summary>
 												<p className='mcp-tool-description'>
@@ -551,11 +337,7 @@ export function ManageServer({
 													schema
 												</h4>
 												<pre>
-													{JSON.stringify(
-														tool.input_schema,
-														null,
-														2,
-													)}
+													{JSON.stringify(tool.input_schema, null, 2)}
 												</pre>
 											</details>
 										),
@@ -583,9 +365,7 @@ export function ManageServer({
 									);
 								}}>
 								<Settings2
-									size={
-										15
-									}
+									size={15}
 									aria-hidden
 								/>{' '}
 								Edit connection
@@ -593,17 +373,13 @@ export function ManageServer({
 							<button
 								className='button primary'
 								disabled={busy}
-								onClick={() =>
-									void check()
-								}>
+								onClick={() => void check()}>
 								<PlugZap
-									size={
-										15
-									}
+									size={15}
 									aria-hidden
 								/>{' '}
 								{operation ===
-								'check'
+									'check'
 									? 'Checking…'
 									: server.last_checked_at
 										? 'Check again'

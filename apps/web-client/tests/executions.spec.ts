@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { expect } from '@playwright/test';
 import { test, ORIGIN } from './fixtures';
 
@@ -29,16 +31,36 @@ test('inspect tool lineage, context links, saved snapshots and execution history
 			await route.fulfill({ status: 202, json: { id: runId, status: 'queued' } });
 		} else await route.fulfill({ json: { items: [run], next_offset: null } });
 	});
-	await page.route(`**${base}/executions/${runId}`, (route) => route.fulfill({ json: run }));
+	await page.route(`**${base}/executions/${runId}**`, (route) => {
+        const path = new URL(route.request().url()).pathname;
+        const { snapshot, spans, ...overview } = run;
+        if (path.endsWith('/snapshot')) return route.fulfill({ json: { snapshot } });
+        if (path.endsWith('/spans')) return route.fulfill({ json: { items: spans.map(span => ({ id: span.id, sequence: span.sequence, parent_id: span.parent_id, kind: span.kind, name: span.name, status: span.status, context_span_ids: span.context_span_ids, duration_ms: span.duration_ms, error_code: null, call_id: span.call_id ?? null, tool_revision: span.tool_revision ?? null, tool_execution_id: span.tool_execution_id ?? null })), next_offset: null } });
+        const span = spans.find(span => path.endsWith(`/spans/${span.id}`));
+        if (span) return route.fulfill({ json: span });
+        return route.fulfill({ json: { ...overview, model_turns: spans.filter(span => span.kind === 'model').length, tool_calls: spans.filter(span => span.kind === 'tool').length, failure_hint: null } });
+    });
 	await page.goto(`/projects/${project.id}/agents`);
+	await page.reload();
+	// Mimic shared CSS arriving after the playground chunk during a cold reload.
+	await page.addStyleTag({ content: ['mcp-servers.css', 'agents.css'].map((file) => readFileSync(resolve('src/app', file), 'utf8')).join('\n') });
 	await page.getByRole('button', { name: 'Playground Trace agent', exact: true }).click();
 	const dialog = page.getByRole('dialog');
+	await expect(dialog).toHaveCSS('display', 'flex');
+	await expect(dialog).toHaveCSS('border-radius', '16px');
+	await expect(dialog.locator('.playground-header')).toHaveCSS('display', 'grid');
+	const bounds = await dialog.boundingBox();
+	expect(bounds).not.toBeNull();
+	expect(bounds!.width).toBe(Math.min(920, page.viewportSize()!.width - 48));
+	expect(bounds!.height).toBe(Math.min(680, page.viewportSize()!.height - 48));
+	expect(Math.abs(bounds!.x - (page.viewportSize()!.width - bounds!.width) / 2)).toBeLessThan(2);
 	await page.screenshot({ path: 'test-results/playground-composer-desktop.png' });
 	await dialog.getByLabel('Task', { exact: true }).fill('Find price');
-	await dialog.getByRole('button', { name: 'Run task', exact: true }).click();
+	await dialog.getByLabel('Task', { exact: true }).press('Control+Enter');
 	await expect(dialog.getByRole('status')).toContainText('completed');
 	await expect(dialog.locator('.execution-answer')).toContainText('Product ABC costs £29.');
 	await expect(dialog.locator('.execution-span')).toHaveCount(0);
+	await expect(dialog.getByRole('button', { name: 'Copy answer' })).toBeVisible();
 	await page.screenshot({ path: 'test-results/playground-answer-desktop.png' });
 	await dialog.locator('.playground-details > summary').click();
 	await expect(dialog.locator('.execution-turn').first().locator('.execution-children')).toContainText('Store / lookup');
@@ -83,4 +105,15 @@ test('inspect tool lineage, context links, saved snapshots and execution history
 	await expect(dialog.getByRole('heading', { name: 'Task stopped' })).toBeVisible();
 	await dialog.getByRole('button', { name: 'New task', exact: true }).click();
 	await expect(dialog.getByLabel('Task', { exact: true })).toHaveValue('');
+	// Long inputs remain readable without pushing the answer below the fold.
+	run.status = 'completed'; run.final_answer = 'Product ABC costs £29.';
+	run.input = 'A detailed task. '.repeat(80);
+	await dialog.getByRole('button', { name: 'History', exact: true }).click();
+	await dialog.locator('.execution-history button').click();
+	await expect(dialog.locator('.playground-task-preview')).toBeVisible();
+	await dialog.getByRole('button', { name: 'Show full task' }).click();
+	await expect(dialog.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+	await dialog.getByRole('button', { name: 'Show less' }).click();
+	await expect(dialog.locator('.playground-task-preview')).toBeVisible();
+	await expect(dialog).toHaveJSProperty('scrollWidth', await dialog.evaluate((element) => element.clientWidth));
 });

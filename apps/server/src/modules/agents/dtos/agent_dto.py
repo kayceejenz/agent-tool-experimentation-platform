@@ -19,8 +19,8 @@ class ModelSettings(StrictModel):
 
 
 class Limits(StrictModel):
-    max_turns: int = Field(default=8, ge=1, le=50, strict=True)
-    max_tool_calls: int = Field(default=10, ge=0, le=100, strict=True)
+    max_turns: int = Field(default=16, ge=1, le=50, strict=True)
+    max_tool_calls: int = Field(default=20, ge=0, le=100, strict=True)
     timeout_seconds: int = Field(default=60, ge=1, le=300, strict=True)
     max_output_tokens: int = Field(default=2048, ge=1, le=32000, strict=True)
 

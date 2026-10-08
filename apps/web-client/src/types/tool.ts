@@ -8,6 +8,7 @@ export type Schema = {
 	enum?: unknown[];
 	[key: string]: unknown;
 };
+
 export type Tool = {
 	id: string;
 	server_id: string;
@@ -24,7 +25,9 @@ export type Tool = {
 		annotations?: { readOnlyHint?: boolean };
 	};
 };
+
 export type ToolPage = { items: Tool[]; next_offset: number | null };
+
 export type ToolExecution = {
 	id: string;
 	revision: number;
@@ -35,3 +38,5 @@ export type ToolExecution = {
 	duration_ms: number | null;
 	created_at: string;
 };
+
+export type ToolSummary = Omit<Tool, 'definition'> & { description?: string };

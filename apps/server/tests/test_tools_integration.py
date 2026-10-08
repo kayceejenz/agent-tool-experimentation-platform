@@ -1,7 +1,8 @@
-import pytest
-from test_mcp_connections_integration import connections, create, query, TOKEN
 from uuid import uuid4
+
+import pytest
 from integrations.mcp.client import ProbeFailure
+from test_mcp_connections_integration import TOKEN, connections, create, query
 
 pytestmark = pytest.mark.integration
 DEFINITION = {

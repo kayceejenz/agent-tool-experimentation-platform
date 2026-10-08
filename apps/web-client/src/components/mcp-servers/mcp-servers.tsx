@@ -1,12 +1,18 @@
 'use client';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, RefreshCw, Settings2 } from 'lucide-react';
 import type { Project } from '@/types/workspace';
 import type { McpServer, McpServerPage } from '@/types/mcp-server';
 import { projectRequest, ProjectRequestError } from '@/lib/projects/client';
 import { ProjectSync } from '@/components/projects/project-provider';
-import { ServerForm } from './server-form';
-import { ManageServer } from './manage-server';
+import { projectWrite } from '@/lib/projects/client';
+
+const ServerForm = dynamic(() => import('./server-form').then(module => module.ServerForm), { loading: () => <p role='status'>Loading dialog…</p> });
+
+
+const ManageServer = dynamic(() => import('./manage-server').then(module => module.ManageServer), { loading: () => <p role='status'>Loading dialog…</p> });
+
 
 export function McpServers({ project }: { project: Project }) {
 	const [servers, setServers] = useState<McpServer[]>([]);
@@ -30,37 +36,37 @@ export function McpServers({ project }: { project: Project }) {
 				const page =
 					await projectRequest<McpServerPage>(
 						base +
-							(after
-								? `?cursor=${encodeURIComponent(after)}`
-								: ''),
+						(after
+							? `?cursor=${encodeURIComponent(after)}`
+							: ''),
 					);
-				if (requestId !== generation.current) return;
+				if(requestId !== generation.current) return;
 				setServers(old =>
 					after
 						? [
-								...new Map(
-									[
-										...old,
-										...page.items,
-									].map(
-										server => [
-											server.id,
-											server,
-										],
-									),
-								).values(),
-							]
+							...new Map(
+								[
+									...old,
+									...page.items,
+								].map(
+									server => [
+										server.id,
+										server,
+									],
+								),
+							).values(),
+						]
 						: page.items,
 				);
 				setCursor(page.next_cursor);
-			} catch (error) {
-				if (requestId !== generation.current) return;
+			} catch(error) {
+				if(requestId !== generation.current) return;
 				setError(
 					error instanceof Error
 						? error.message
 						: 'Unable to load connections.',
 				);
-				if (
+				if(
 					error instanceof ProjectRequestError &&
 					[403, 404].includes(error.status)
 				) {
@@ -68,7 +74,7 @@ export function McpServers({ project }: { project: Project }) {
 					setServers([]);
 				}
 			} finally {
-				if (requestId === generation.current)
+				if(requestId === generation.current)
 					setLoading(false);
 			}
 		},
@@ -80,25 +86,25 @@ export function McpServers({ project }: { project: Project }) {
 		const requestId = ++counter.current;
 		void projectRequest<McpServerPage>(base)
 			.then(page => {
-				if (requestId !== counter.current) return;
+				if(requestId !== counter.current) return;
 				setServers(page.items);
 				setCursor(page.next_cursor);
 			})
 			.catch(error => {
-				if (requestId !== counter.current) return;
+				if(requestId !== counter.current) return;
 				setError(
 					error instanceof Error
 						? error.message
 						: 'Unable to load connections.',
 				);
-				if (
+				if(
 					error instanceof ProjectRequestError &&
 					[403, 404].includes(error.status)
 				)
 					setDenied(true);
 			})
 			.finally(() => {
-				if (requestId === counter.current)
+				if(requestId === counter.current)
 					setLoading(false);
 			});
 		return () => {
@@ -116,10 +122,10 @@ export function McpServers({ project }: { project: Project }) {
 		setServers(old =>
 			old.some(item => item.id === server.id)
 				? old.map(item =>
-						item.id === server.id
-							? server
-							: item,
-					)
+					item.id === server.id
+						? server
+						: item,
+				)
 				: [server, ...old],
 		);
 	}
@@ -128,7 +134,7 @@ export function McpServers({ project }: { project: Project }) {
 		opener.current = document.activeElement as HTMLElement;
 		setNotice('');
 		setError('');
-		if (server) setManaging(server);
+		if(server) setManaging(server);
 		else setCreating(true);
 	}
 
@@ -145,35 +151,25 @@ export function McpServers({ project }: { project: Project }) {
 	}
 
 	async function toggle(server: McpServer) {
-		if (busyId || !canManage) return;
+		if(busyId || !canManage) return;
 		setBusyId(server.id);
 		setError('');
 		setNotice('');
 		try {
-			const updated = await projectRequest<McpServer>(
-				`${base}/${server.id}`,
-				{
-					method: 'PATCH',
-					headers: {
-						'Content-Type':
-							'application/json',
-					},
-					body: JSON.stringify({
-						enabled: !server.enabled,
-					}),
-				},
-			);
+			const updated = await projectWrite<McpServer>(`${base}/${server.id}`, 'PATCH', {
+				enabled: !server.enabled,
+			});
 			upsert(updated);
 			setNotice(
 				`${updated.name} ${updated.enabled ? 'enabled' : 'disabled'}.`,
 			);
-		} catch (error) {
+		} catch(error) {
 			setError(
 				error instanceof Error
 					? error.message
 					: 'Unable to change this connection.',
 			);
-			if (
+			if(
 				error instanceof ProjectRequestError &&
 				[403, 404].includes(error.status)
 			)
@@ -215,9 +211,7 @@ export function McpServers({ project }: { project: Project }) {
 								loading ||
 								Boolean(busyId)
 							}
-							onClick={() =>
-								open(null)
-							}>
+							onClick={() => open(null)}>
 							<Plus
 								size={16}
 								aria-hidden
@@ -317,24 +311,16 @@ export function McpServers({ project }: { project: Project }) {
 								{servers.map(
 									server => (
 										<tr
-											key={
-												server.id
-											}
-											aria-label={
-												server.name
-											}>
+											key={server.id}
+											aria-label={server.name}>
 											<th scope='row'>
 												<div className='mcp-identity'>
 													<div>
 														<span className='mcp-name'>
-															{
-																server.name
-															}
+															{server.name}
 														</span>
 														<p className='mcp-endpoint'>
-															{
-																server.endpoint
-															}
+															{server.endpoint}
 														</p>
 														<span className='mcp-meta'>
 															Streamable
@@ -346,7 +332,7 @@ export function McpServers({ project }: { project: Project }) {
 
 											<td>
 												{server.auth_type ===
-												'none' ? (
+													'none' ? (
 													'None'
 												) : (
 													<>
@@ -366,10 +352,10 @@ export function McpServers({ project }: { project: Project }) {
 												<span
 													className={`mcp-status ${server.connection_status}`}>
 													{server.connection_status ===
-													'untested'
+														'untested'
 														? 'Not checked'
 														: server.connection_status ===
-															  'connected'
+															'connected'
 															? 'Connected'
 															: 'Check failed'}
 												</span>
@@ -380,9 +366,7 @@ export function McpServers({ project }: { project: Project }) {
 														className='mcp-toggle'
 														type='button'
 														role='switch'
-														aria-checked={
-															server.enabled
-														}
+														aria-checked={server.enabled}
 														aria-label={`Enable ${server.name}`}
 														disabled={
 															loading ||
@@ -390,17 +374,13 @@ export function McpServers({ project }: { project: Project }) {
 																busyId,
 															)
 														}
-														onClick={() =>
-															void toggle(
-																server,
-															)
-														}>
+														onClick={() => void toggle(server)}>
 														<span
 															aria-hidden
 														/>
 														<span>
 															{busyId ===
-															server.id
+																server.id
 																? 'Saving…'
 																: server.enabled
 																	? 'Enabled'
@@ -425,15 +405,9 @@ export function McpServers({ project }: { project: Project }) {
 															busyId,
 														)
 													}
-													onClick={() =>
-														open(
-															server,
-														)
-													}>
+													onClick={() => open(server)}>
 													<Settings2
-														size={
-															15
-														}
+														size={15}
 														aria-hidden
 													/>{' '}
 													Manage
@@ -450,9 +424,7 @@ export function McpServers({ project }: { project: Project }) {
 					<div className='mcp-feedback'>
 						<button
 							className='button'
-							onClick={() =>
-								refresh(cursor)
-							}>
+							onClick={() => refresh(cursor)}>
 							Load more servers
 						</button>
 					</div>

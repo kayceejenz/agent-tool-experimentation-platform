@@ -16,9 +16,11 @@ async def list_tools(
     request: Request,
     server_id: UUID | None = None,
     offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+    q: Annotated[str, Query(max_length=160)] = "",
+    summary: bool = False,
 ):
     return await request.app.state.tools.repository.list(
-        user.id, project_id, server_id, offset
+        user.id, project_id, server_id, offset, q, summary
     )
 
 
@@ -53,3 +55,17 @@ async def execution_history(
     return await request.app.state.tools.repository.history(
         user.id, project_id, tool_id
     )
+
+
+@router.get("/{tool_id}/executions/requests/{request_id}")
+async def operation(
+    project_id: UUID, tool_id: UUID, request_id: UUID, user: User, request: Request
+):
+    return await request.app.state.tools.repository.operation(
+        user.id, project_id, tool_id, request_id
+    )
+
+
+@router.get("/{tool_id}")
+async def tool_detail(project_id: UUID, tool_id: UUID, user: User, request: Request):
+    return await request.app.state.tools.repository.get(user.id, project_id, tool_id)

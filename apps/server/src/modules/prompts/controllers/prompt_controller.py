@@ -31,8 +31,9 @@ async def list_prompts(
     request: Request,
     offset: Annotated[int, Query(ge=0, le=100000)] = 0,
     type: PromptType | None = None,
+    q: Annotated[str, Query(max_length=160)] = "",
 ):
-    return await request.app.state.prompts.list(user.id, project_id, offset, type)
+    return await request.app.state.prompts.list(user.id, project_id, offset, type, q)
 
 
 @router.get("/{prompt_id}", response_model=PromptResponse)

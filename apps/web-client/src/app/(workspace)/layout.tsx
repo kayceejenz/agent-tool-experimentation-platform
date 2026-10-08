@@ -29,5 +29,15 @@ export default async function WorkspaceLayout({
 			`${hasRefresh ? '/auth/refresh' : '/auth/signin'}?callbackUrl=${encodeURIComponent(callback)}&error=SessionExpired`,
 		);
 	}
-	return <ProjectProvider key={user.id}><AppShell user={user}>{children}</AppShell></ProjectProvider>;
+	return (
+		<ProjectProvider key={user.id} userId={user.id}>
+			<AppShell user={user}>{children}</AppShell>
+		</ProjectProvider>
+	);
 }
+
+import '../projects.css';
+import '../mcp-servers.css';
+import '../tools.css';
+import '../prompts.css';
+import '../agents.css';

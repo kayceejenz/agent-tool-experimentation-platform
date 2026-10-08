@@ -77,15 +77,15 @@ class PromptRepository:
                     raise PromptError(404, "Revision not found")
                 return row
 
-    async def list(self, user_id, project_id, offset, prompt_type=None):
+    async def list(self, user_id, project_id, offset, prompt_type=None, query=""):
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
                 await self.member(db, user_id, project_id)
                 rows = await (
                     await db.execute(
                         SUMMARY
-                        + " WHERE p.project_id=%s AND (%s::text IS NULL OR p.type=%s) ORDER BY p.created_at DESC,p.id DESC LIMIT 21 OFFSET %s",
-                        (project_id, prompt_type, prompt_type, offset),
+                        + " WHERE p.project_id=%s AND (%s::text IS NULL OR p.type=%s) AND strpos(lower(r.name),lower(%s))>0 ORDER BY p.created_at DESC,p.id DESC LIMIT 21 OFFSET %s",
+                        (project_id, prompt_type, prompt_type, query, offset),
                     )
                 ).fetchall()
                 return {

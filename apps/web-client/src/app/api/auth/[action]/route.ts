@@ -1,3 +1,9 @@
+import {
+	BODY_LIMITS,
+	readBoundedJson,
+	readBoundedBody,
+	RequestBodyError,
+} from '@/lib/http/request-body';
 import { cookies } from 'next/headers';
 import {
 	AuthError,
@@ -43,14 +49,16 @@ export async function POST(request: Request, context: Context) {
 					415,
 					'Send JSON form data.',
 				);
-			let input: Record<string, unknown>;
-			try {
-				input = await request.json();
-			} catch {
-				throw new AuthError(400, 'Invalid form data.');
-			}
+			const input = await readBoundedJson(
+				request,
+				BODY_LIMITS.auth,
+			);
 			if (
 				!input ||
+				typeof input !== 'object' ||
+				Array.isArray(input) ||
+				!('email' in input) ||
+				!('password' in input) ||
 				typeof input.email !== 'string' ||
 				typeof input.password !== 'string' ||
 				!input.email ||
@@ -67,11 +75,15 @@ export async function POST(request: Request, context: Context) {
 				...(action === 'register'
 					? {
 							display_name:
-								input.display_name ??
-								null,
+								'display_name' in
+								input
+									? input.display_name
+									: null,
 							invitation_code:
-								input.invitation_code ??
-								null,
+								'invitation_code' in
+								input
+									? input.invitation_code
+									: null,
 						}
 					: {}),
 			};
@@ -98,6 +110,7 @@ export async function POST(request: Request, context: Context) {
 			return response;
 		}
 
+		await readBoundedBody(request, BODY_LIMITS.control);
 		const refresh = (await cookies()).get(REFRESH_COOKIE)?.value;
 		if (action === 'logout') {
 			if (refresh)
@@ -134,7 +147,10 @@ export async function POST(request: Request, context: Context) {
 
 		return response;
 	} catch (error) {
-		const response = authFailure(error);
+		const response =
+			error instanceof RequestBodyError
+				? json({ error: error.message }, error.status)
+				: authFailure(error);
 
 		if (
 			action === 'refresh' &&

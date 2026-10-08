@@ -35,10 +35,13 @@ export function checkOrigin(request: Request) {
 		);
 }
 
-export function json(data: unknown, status = 200) {
+export function json(data: unknown, status = 200, retryAfter?: string) {
 	return NextResponse.json(data, {
 		status,
-		headers: { 'Cache-Control': 'no-store' },
+		headers: {
+			'Cache-Control': 'no-store',
+			...(retryAfter ? { 'Retry-After': retryAfter } : {}),
+		},
 	});
 }
 
@@ -177,9 +180,26 @@ export function clearTokens(response: NextResponse) {
 export function clientAddressHeaders(request: Request): Record<string, string> {
 	const secret = process.env.AUTH_PROXY_SECRET;
 	const header = process.env.AUTH_CLIENT_IP_HEADER;
-	if (!secret || secret.length < 32 || (process.env.NODE_ENV === 'production' && !header && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(appOrigin()).hostname)))
-		throw new AuthError(503, 'Authentication proxy configuration unavailable.');
-	const address = header ? request.headers.get(header)?.trim() : '127.0.0.1';
-	if (!address || !isIP(address)) throw new AuthError(503, 'Authentication client address unavailable.');
+	if (
+		!secret ||
+		secret.length < 32 ||
+		(process.env.NODE_ENV === 'production' &&
+			!header &&
+			!['localhost', '127.0.0.1', '[::1]'].includes(
+				new URL(appOrigin()).hostname,
+			))
+	)
+		throw new AuthError(
+			503,
+			'Authentication proxy configuration unavailable.',
+		);
+	const address = header
+		? request.headers.get(header)?.trim()
+		: '127.0.0.1';
+	if (!address || !isIP(address))
+		throw new AuthError(
+			503,
+			'Authentication client address unavailable.',
+		);
 	return { 'X-Agent-Proxy-Secret': secret, 'X-Agent-Client-IP': address };
 }

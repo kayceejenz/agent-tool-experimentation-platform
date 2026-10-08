@@ -101,24 +101,36 @@ def test_invitation_code_has_no_length_constraints():
             == code
         )
 
-@pytest.mark.parametrize("headers,expected", [
-    ({"x-agent-client-ip": "192.0.2.1"}, 403),
-    ({"x-agent-proxy-secret": "wrong", "x-agent-client-ip": "192.0.2.1"}, 403),
-    ({"x-agent-proxy-secret": SECRET, "x-agent-client-ip": "not-an-ip"}, 400),
-])
+
+@pytest.mark.parametrize(
+    "headers,expected",
+    [
+        ({"x-agent-client-ip": "192.0.2.1"}, 403),
+        ({"x-agent-proxy-secret": "wrong", "x-agent-client-ip": "192.0.2.1"}, 403),
+        ({"x-agent-proxy-secret": SECRET, "x-agent-client-ip": "not-an-ip"}, 400),
+    ],
+)
 def test_untrusted_proxy_cannot_choose_rate_limit_bucket(headers, expected):
     import asyncio
     from types import SimpleNamespace
     from unittest.mock import AsyncMock
-    from fastapi import HTTPException
-    from starlette.requests import Request
-    from modules.auth.controllers.auth_controller import enforce_auth_rate_limit
 
-    request = Request({
-        "type": "http", "client": ("127.0.0.1", 1234),
-        "headers": [(k.encode(), v.encode()) for k, v in headers.items()],
-        "app": SimpleNamespace(state=SimpleNamespace(settings=Settings(_env_file=None, auth_proxy_secret=SECRET))),
-    })
+    from fastapi import HTTPException
+    from modules.auth.controllers.auth_controller import enforce_auth_rate_limit
+    from starlette.requests import Request
+
+    request = Request(
+        {
+            "type": "http",
+            "client": ("127.0.0.1", 1234),
+            "headers": [(k.encode(), v.encode()) for k, v in headers.items()],
+            "app": SimpleNamespace(
+                state=SimpleNamespace(
+                    settings=Settings(_env_file=None, auth_proxy_secret=SECRET)
+                )
+            ),
+        }
+    )
     limiter = AsyncMock()
     with pytest.raises(HTTPException) as error:
         asyncio.run(enforce_auth_rate_limit(request, limiter, "login"))

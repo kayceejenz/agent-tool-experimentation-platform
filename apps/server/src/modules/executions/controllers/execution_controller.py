@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from api.dependencies import current_user
@@ -38,10 +38,28 @@ async def history(
 
 
 @router.get("/executions/{execution_id}")
-async def detail(project_id: UUID, execution_id: UUID, user: User, request: Request):
-    return await request.app.state.executions.get(user.id, project_id, execution_id)
+async def detail(project_id: UUID, execution_id: UUID, user: User, request: Request,
+                 view: Literal["full", "summary", "status"] = "full"):
+    return await request.app.state.executions.get(user.id, project_id, execution_id, view)
 
 
 @router.post("/executions/{execution_id}/cancel")
-async def cancel(project_id: UUID, execution_id: UUID, user: User, request: Request):
-    return await request.app.state.executions.cancel(user.id, project_id, execution_id)
+async def cancel(project_id: UUID, execution_id: UUID, user: User, request: Request,
+                 view: Literal["full", "summary"] = "full"):
+    return await request.app.state.executions.cancel(user.id, project_id, execution_id, view)
+
+
+@router.get("/executions/{execution_id}/spans")
+async def spans(project_id: UUID, execution_id: UUID, user: User, request: Request,
+                offset: Annotated[int, Query(ge=0, le=100000)] = 0):
+    return await request.app.state.executions.trace(user.id, project_id, execution_id, offset)
+
+
+@router.get("/executions/{execution_id}/spans/{span_id}")
+async def span(project_id: UUID, execution_id: UUID, span_id: UUID, user: User, request: Request):
+    return await request.app.state.executions.trace(user.id, project_id, execution_id, span_id=span_id)
+
+
+@router.get("/executions/{execution_id}/snapshot")
+async def snapshot(project_id: UUID, execution_id: UUID, user: User, request: Request):
+    return await request.app.state.executions.trace(user.id, project_id, execution_id, snapshot=True)

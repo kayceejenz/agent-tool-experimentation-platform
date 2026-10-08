@@ -1,11 +1,17 @@
 'use client';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProjectSync } from '@/components/projects/project-provider';
 import { projectRequest } from '@/lib/projects/client';
 import type { Project } from '@/types/workspace';
 import type { Tool, ToolPage } from '@/types/tool';
-import { ToolTester } from './tool-tester';
+import { projectWrite } from '@/lib/projects/client';
+
+const ToolTester = dynamic(
+	() => import('./tool-tester').then(module => module.ToolTester),
+	{ loading: () => <p role='status'>Loading dialog…</p> },
+);
 
 export function Tools({ project }: { project: Project }) {
 	const [tools, setTools] = useState<Tool[]>([]);
@@ -70,18 +76,12 @@ export function Tools({ project }: { project: Project }) {
 		setBusy(tool.id);
 		setError('');
 		try {
-			const updated = await projectRequest<Tool>(
+			const updated = await projectWrite<Tool>(
 				`${base}/${tool.id}`,
+				'PATCH',
 				{
-					method: 'PATCH',
-					headers: {
-						'Content-Type':
-							'application/json',
-					},
-					body: JSON.stringify({
-						enabled: !tool.enabled,
-						revision: tool.revision,
-					}),
+					enabled: !tool.enabled,
+					revision: tool.revision,
 				},
 			);
 			setTools(old =>

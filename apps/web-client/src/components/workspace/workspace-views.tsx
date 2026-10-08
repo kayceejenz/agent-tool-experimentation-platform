@@ -1,14 +1,8 @@
-import { Agents } from '@/components/agents/agents';
-import { Prompts } from '@/components/prompts/prompts';
-import { Tools } from '@/components/tools/tools';
-import { McpServers } from '@/components/mcp-servers/mcp-servers';
 import { ProjectRows } from '@/components/projects/project-list';
-import { ProjectForm } from '@/components/projects/project-form';
 import { ProjectSync } from '@/components/projects/project-provider';
 import Link from 'next/link';
 import { ArrowRight, Workflow } from 'lucide-react';
-import { sections } from '@/lib/workspace';
-import type { Project, Section } from '@/types/workspace';
+import type { Project } from '@/types/workspace';
 
 export function PageHeader({
 	title,
@@ -150,6 +144,7 @@ export function ProjectTabs({
 		</nav>
 	);
 }
+
 export function ProjectOverview({ project }: { project: Project }) {
 	const base = `/projects/${project.id}`;
 	return (
@@ -174,61 +169,6 @@ export function ProjectOverview({ project }: { project: Project }) {
 					<ArrowRight size={16} />
 				</Link>
 			</section>
-		</>
-	);
-}
-export function SectionView({
-	project,
-	section,
-}: {
-	project: Project;
-	section: Section;
-}) {
-	if (section === 'agents') return <Agents key={project.id} project={project} />;
-	if (section === 'prompts')
-		return <Prompts key={project.id} project={project} />;
-	if (section === 'tools')
-		return <Tools key={project.id} project={project} />;
-	if (section === 'servers')
-		return <McpServers key={project.id} project={project} />;
-	const details = sections[section];
-	return (
-		<>
-			<PageHeader
-				title={details.title}
-				description={details.description}>
-				<span className='badge'>{project.name}</span>
-			</PageHeader>
-			{section === 'settings' ? (
-				<>
-					<ProjectTabs
-						project={project}
-						settings
-					/>
-					<ProjectSync project={project} />
-					<section className='panel'>
-						<ProjectForm
-							key={project.id}
-							project={project}
-						/>
-					</section>
-				</>
-			) : (
-				<section className='panel empty-state'>
-					<ProjectSync project={project} />
-					<h2>{details.empty}</h2>
-					<p>
-						{details.title} is not available
-						yet.
-					</p>
-					<Link
-						className='button'
-						href={`/projects/${project.id}`}>
-						Back to project{' '}
-						<ArrowRight size={16} />
-					</Link>
-				</section>
-			)}
 		</>
 	);
 }

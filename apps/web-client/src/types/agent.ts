@@ -1,9 +1,11 @@
 export type Reference = { id: string; revision: number };
+
 export type PromptBinding = Reference & {
 	name: string;
 	content: string;
 	latest_revision: number;
 };
+
 export type ToolBinding = Reference & {
 	name: string;
 	server_id: string;
@@ -13,6 +15,7 @@ export type ToolBinding = Reference & {
 	available: boolean;
 	server_enabled: boolean;
 };
+
 export type AgentConfig = {
 	name: string;
 	description: string;
@@ -31,6 +34,7 @@ export type AgentConfig = {
 		max_output_tokens: number;
 	};
 };
+
 export type AgentSummary = {
 	id: string;
 	name: string;
@@ -41,6 +45,7 @@ export type AgentSummary = {
 	model_settings: AgentConfig['model_settings'];
 	created_at: string;
 };
+
 export type Agent = Omit<AgentSummary, 'tool_count'> & {
 	current_revision: number;
 	system_prompt: PromptBinding | null;
@@ -51,7 +56,9 @@ export type Agent = Omit<AgentSummary, 'tool_count'> & {
 	configuration_ready: boolean;
 	runtime_available: false;
 };
+
 export type AgentPage = { items: AgentSummary[]; next_offset: number | null };
+
 export function configOf(agent: Agent): AgentConfig {
 	const reference = (value: Reference | null) =>
 		value ? { id: value.id, revision: value.revision } : null;
@@ -63,10 +70,11 @@ export function configOf(agent: Agent): AgentConfig {
 		model_settings: agent.model_settings,
 		limits: agent.limits,
 		tools: agent.tools
-			.map((t) => ({ id: t.id, revision: t.revision }))
+			.map(t => ({ id: t.id, revision: t.revision }))
 			.sort((a, b) => a.id.localeCompare(b.id)),
 	};
 }
+
 export const newAgent: AgentConfig = {
 	name: '',
 	description: '',
@@ -75,8 +83,8 @@ export const newAgent: AgentConfig = {
 	model_settings: { provider: '', model: '', temperature: null },
 	tools: [],
 	limits: {
-		max_turns: 8,
-		max_tool_calls: 10,
+		max_turns: 16,
+		max_tool_calls: 20,
 		timeout_seconds: 60,
 		max_output_tokens: 2048,
 	},

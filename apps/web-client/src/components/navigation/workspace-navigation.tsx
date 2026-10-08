@@ -2,12 +2,9 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-	Bot,
 	ChevronDown,
 	FileCode2,
-	FlaskConical,
 	FolderKanban,
-	Gauge,
 	Home,
 	Server,
 	Settings,
@@ -21,9 +18,6 @@ const projectSections = [
 	{ label: 'Tools', slug: 'tools', icon: Wrench },
 	{ label: 'Prompts', slug: 'prompts', icon: FileCode2 },
 	{ label: 'Agents', slug: 'agents', icon: Workflow },
-	{ label: 'Assistants', slug: 'assistants', icon: Bot },
-	{ label: 'Experiments', slug: 'experiments', icon: FlaskConical },
-	{ label: 'Benchmarks', slug: 'benchmarks', icon: Gauge },
 ];
 
 export function WorkspaceNavigation({

@@ -1,13 +1,8 @@
 'use client';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { projectRequest, ProjectRequestError } from '@/lib/projects/client';
-import {
-	promptTypes,
-	type Prompt,
-	type PromptPage,
-	type PromptSummary,
-	type PromptType,
-} from '@/types/prompt';
+import { promptTypes, type PromptSummary, type PromptType } from '@/types/prompt';
+import { usePromptEditor } from '@/components/prompts/use-prompt-editor';
+import { PromptHistory } from './prompt-history';
+import { UnsavedChanges } from '@/components/unsaved-changes';
 
 type Props = {
 	projectId: string;
@@ -16,6 +11,8 @@ type Props = {
 	onClose: () => void;
 	onSaved: () => void;
 };
+
+
 export function PromptEditor({
 	projectId,
 	initial,
@@ -23,126 +20,31 @@ export function PromptEditor({
 	onClose,
 	onSaved,
 }: Props) {
-	const dialog = useRef<HTMLDialogElement>(null);
-	const [current, setCurrent] = useState<Prompt | null>(null),
-		[name, setName] = useState(''),
-		[description, setDescription] = useState(''),
-		[content, setContent] = useState(''),
-		[type, setType] = useState<PromptType>('system');
-	const [loading, setLoading] = useState(!!initial),
-		[busy, setBusy] = useState(false),
-		[error, setError] = useState(''),
-		[notice, setNotice] = useState(''),
-		[denied, setDenied] = useState(false),
-		[discard, setDiscard] = useState(false),
-		[tab, setTab] = useState<'edit' | 'history'>('edit');
-	const base = `/${projectId}/prompts`;
-	const dirty = current
-		? name !== current.name ||
-			description !== current.description ||
-			content !== current.content
-		: !!(name || description || content);
-	const editable =
-		canEdit && !denied && !loading && (!initial || !!current);
-	function apply(prompt: Prompt) {
-		setCurrent(prompt);
-		setName(prompt.name);
-		setDescription(prompt.description);
-		setContent(prompt.content);
-		setType(prompt.type);
-	}
-	useEffect(() => {
-		const element = dialog.current,
-			overflow = document.body.style.overflow;
-		element?.showModal();
-		document.body.style.overflow = 'hidden';
-		return () => {
-			element?.close();
-			document.body.style.overflow = overflow;
-		};
-	}, []);
-	useEffect(() => {
-		if (!initial) return;
-		let active = true;
-		void projectRequest<Prompt>(`${base}/${initial.id}`)
-			.then(prompt => {
-				if (active) apply(prompt);
-			})
-			.catch(e => {
-				if (active) setError(e.message);
-			})
-			.finally(() => {
-				if (active) setLoading(false);
-			});
-		return () => {
-			active = false;
-		};
-	}, [base, initial]);
-	useEffect(() => {
-		if (!dirty) return;
-		function prevent(event: BeforeUnloadEvent) {
-			event.preventDefault();
-		}
-		window.addEventListener('beforeunload', prevent);
-		return () =>
-			window.removeEventListener('beforeunload', prevent);
-	}, [dirty]);
-	function close() {
-		if (busy) return;
-		if (dirty) {
-			setDiscard(true);
-			return;
-		}
-		onClose();
-	}
-	async function save(event: FormEvent) {
-		event.preventDefault();
-		if (!editable || busy) return;
-		setBusy(true);
-		setError('');
-		setNotice('');
-		try {
-			const prompt = await projectRequest<Prompt>(
-				current
-					? `${base}/${current.id}/revisions`
-					: base,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type':
-							'application/json',
-					},
-					body: JSON.stringify({
-						name,
-						description,
-						content,
-						...(current
-							? {
-									base_revision:
-										current.revision,
-								}
-							: { type }),
-					}),
-				},
-			);
-			apply(prompt);
-			setNotice(`Revision ${prompt.revision} saved.`);
-			onSaved();
-		} catch (e) {
-			setError(
-				e instanceof Error
-					? e.message
-					: 'Unable to save prompt.',
-			);
-			if (
-				e instanceof ProjectRequestError &&
-				[403, 404].includes(e.status)
-			)
-				setDenied(true);
-		} finally {
-			setBusy(false);
-		}
-	}
+	const {
+		dialog,
+		current,
+		name,
+		setName,
+		description,
+		setDescription,
+		content,
+		setContent,
+		type,
+		setType,
+		loading,
+		busy,
+		error,
+		notice,
+		discard,
+		setDiscard,
+		tab,
+		setTab,
+		base,
+		dirty,
+		editable,
+		close,
+		save,
+	} = usePromptEditor({ projectId, initial, canEdit, onClose, onSaved });
 	return (
 		<dialog
 			ref={dialog}
@@ -175,29 +77,7 @@ export function PromptEditor({
 			</header>
 			<div className='mcp-sheet-body'>
 				{discard && (
-					<div
-						className='prompt-discard'
-						role='alert'>
-						<p>You have unsaved changes.</p>
-						<div className='mcp-header-actions'>
-							<button
-								className='button'
-								onClick={() =>
-									setDiscard(
-										false,
-									)
-								}>
-								Keep editing
-							</button>
-							<button
-								className='button'
-								onClick={
-									onClose
-								}>
-								Discard changes
-							</button>
-						</div>
-					</div>
+					<UnsavedChanges onKeepEditing={() => setDiscard(false)} onDiscard={onClose} />
 				)}
 				{error && (
 					<p className='mcp-error' role='alert'>
@@ -212,12 +92,8 @@ export function PromptEditor({
 						aria-label='Prompt views'>
 						<button
 							className='button'
-							aria-pressed={
-								tab === 'edit'
-							}
-							onClick={() =>
-								setTab('edit')
-							}>
+							aria-pressed={tab === 'edit'}
+							onClick={() => setTab('edit')}>
 							Current revision
 						</button>
 						<button
@@ -226,11 +102,7 @@ export function PromptEditor({
 								tab ===
 								'history'
 							}
-							onClick={() =>
-								setTab(
-									'history',
-								)
-							}>
+							onClick={() => setTab('history')}>
 							Revision history
 						</button>
 					</div>
@@ -254,9 +126,7 @@ export function PromptEditor({
 						<label className='tool-field'>
 							Name
 							<input
-								autoFocus={
-									!initial
-								}
+								autoFocus={!initial}
 								required
 								maxLength={160}
 								value={name}
@@ -297,15 +167,9 @@ export function PromptEditor({
 										item,
 									]) => (
 										<option
-											key={
-												key
-											}
-											value={
-												key
-											}>
-											{
-												item.label
-											}
+											key={key}
+											value={key}>
+											{item.label}
 										</option>
 									),
 								)}
@@ -330,9 +194,7 @@ export function PromptEditor({
 							<textarea
 								rows={2}
 								maxLength={2000}
-								value={
-									description
-								}
+								value={description}
 								disabled={
 									!editable ||
 									busy
@@ -352,17 +214,13 @@ export function PromptEditor({
 								className='prompt-content'
 								required
 								rows={15}
-								maxLength={
-									32000
-								}
+								maxLength={32000}
 								value={content}
 								disabled={
 									!editable ||
 									busy
 								}
-								spellCheck={
-									false
-								}
+								spellCheck={false}
 								onChange={e =>
 									setContent(
 										e
@@ -406,143 +264,5 @@ export function PromptEditor({
 				)}
 			</div>
 		</dialog>
-	);
-}
-function PromptHistory({ base }: { base: string }) {
-	const [items, setItems] = useState<PromptSummary[]>([]),
-		[offset, setOffset] = useState<number | null>(null),
-		[loading, setLoading] = useState(true),
-		[error, setError] = useState(''),
-		[preview, setPreview] = useState<Prompt | null>(null);
-	const generation = useRef(0),
-		active = useRef(true);
-	useEffect(() => {
-		const counter = generation;
-		active.current = true;
-		let valid = true;
-		void projectRequest<PromptPage>(`${base}/revisions`)
-			.then(page => {
-				if (valid) {
-					setItems(page.items);
-					setOffset(page.next_offset);
-				}
-			})
-			.catch(e => {
-				if (valid) setError(e.message);
-			})
-			.finally(() => {
-				if (valid) setLoading(false);
-			});
-		return () => {
-			valid = false;
-			active.current = false;
-			counter.current++;
-		};
-	}, [base]);
-	async function view(revision: number) {
-		const id = ++generation.current;
-		setLoading(true);
-		setError('');
-		try {
-			const value = await projectRequest<Prompt>(
-				`${base}/revisions/${revision}`,
-			);
-			if (id === generation.current && active.current)
-				setPreview(value);
-		} catch (e) {
-			if (id === generation.current && active.current)
-				setError(
-					e instanceof Error
-						? e.message
-						: 'Unable to load revision.',
-				);
-		} finally {
-			if (id === generation.current && active.current)
-				setLoading(false);
-		}
-	}
-	async function more() {
-		if (offset === null) return;
-		setLoading(true);
-		try {
-			const page = await projectRequest<PromptPage>(
-				`${base}/revisions?offset=${offset}`,
-			);
-			if (active.current) {
-				setItems(old => [...old, ...page.items]);
-				setOffset(page.next_offset);
-			}
-		} catch (e) {
-			if (active.current)
-				setError(
-					e instanceof Error
-						? e.message
-						: 'Unable to load history.',
-				);
-		} finally {
-			if (active.current) setLoading(false);
-		}
-	}
-	return (
-		<section>
-			<h3>Revision history</h3>
-			<p className='mcp-note'>
-				Saved versions are read-only. Select a revision
-				to inspect its original instructions.
-			</p>
-			{error && (
-				<p className='mcp-error' role='alert'>
-					{error}
-				</p>
-			)}
-			{loading && <p role='status'>Loading…</p>}
-			<ol className='prompt-revisions'>
-				{items.map(item => (
-					<li key={item.revision}>
-						<div>
-							<strong>
-								Revision{' '}
-								{item.revision}
-							</strong>
-							<small>
-								{item.name} ·{' '}
-								{new Date(
-									item.created_at,
-								).toLocaleString()}
-							</small>
-						</div>
-						<button
-							className='button'
-							disabled={loading}
-							aria-label={`View revision ${item.revision}`}
-							onClick={() =>
-								void view(
-									item.revision,
-								)
-							}>
-							View
-						</button>
-					</li>
-				))}
-			</ol>
-			{offset !== null && (
-				<button
-					className='button'
-					disabled={loading}
-					onClick={() => void more()}>
-					Load older revisions
-				</button>
-			)}
-			{preview && (
-				<article className='prompt-preview'>
-					<h3>
-						Revision {preview.revision}:{' '}
-						{preview.name}
-					</h3>
-					<p>{preview.description}</p>
-					<pre>{preview.content}</pre>
-				</article>
-			)}
-		</section>
 	);
 }

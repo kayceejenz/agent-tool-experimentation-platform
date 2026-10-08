@@ -13,6 +13,7 @@ import { projectRequest } from '@/lib/projects/client';
 
 type Page = { items: Project[]; next_cursor: string | null };
 type State = {
+	userId: string;
 	selectedProject: Project | null;
 	select: (project: Project) => void;
 	projects: Project[];
@@ -24,7 +25,7 @@ type State = {
 };
 
 const Context = createContext<State | null>(null);
-export function ProjectProvider({ children }: { children: ReactNode }) {
+export function ProjectProvider({ children, userId }: { children: ReactNode; userId: string }) {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [selectedProject, select] = useState<Project | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -93,6 +94,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 	return (
 		<Context.Provider
 			value={{
+				userId,
 				selectedProject,
 				select,
 				projects,
