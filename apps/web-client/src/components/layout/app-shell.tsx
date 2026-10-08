@@ -35,7 +35,7 @@ export function AppShell({
 				<div className='rail-top'>
 					<Link
 						className='rail-brand'
-						href='/'
+						href='/projects'
 						onClick={() => setOpen(false)}>
 						kayceejenz.ai <span>Agent</span>
 					</Link>

@@ -49,7 +49,7 @@ test('registration, protected routes, private cookies, and logout', async ({
 	const other = await context.newPage();
 	await other.goto('/');
 	await expect(
-		other.getByRole('heading', { name: 'Workspace overview' }),
+		other.getByRole('heading', { name: 'Projects', exact: true }),
 	).toBeVisible();
 	await page
 		.getByRole('button', { name: 'Sign out', exact: true })
@@ -112,7 +112,7 @@ test('expired access refreshes across tabs and invalid refresh returns to sign i
 	await Promise.all([page.goto('/projects'), other.goto('/')]);
 	await expect(page).toHaveURL(/\/projects$/);
 	await expect(
-		other.getByRole('heading', { name: 'Workspace overview' }),
+		other.getByRole('heading', { name: 'Projects', exact: true }),
 	).toBeVisible();
 	const renewed = (await context.cookies()).find(
 		cookie => cookie.name === 'agent_refresh_token',
@@ -165,7 +165,7 @@ test('mutations reject missing or foreign origins and callbacks stay local', asy
 	await page
 		.getByRole('button', { name: 'Sign in', exact: true })
 		.click();
-	await expect(page).toHaveURL(ORIGIN + '/');
+	await expect(page).toHaveURL(ORIGIN + '/projects');
 });
 
 test('sign-in layout supports mobile, keyboard tabs, and both themes', async ({
@@ -386,4 +386,33 @@ test('waiting for another tab has a bounded timeout', async ({
 	await expect(page.getByRole('region').getByRole('alert')).toContainText(
 		'email or password is incorrect',
 	);
+});
+
+
+test('plain sign-in opens projects and a valid project callback stays scoped', async ({ page, request }) => {
+ const email = `landing-${randomUUID()}@example.com`;
+ const headers = { Origin: ORIGIN };
+ const registration = await request.post('/api/auth/register', {
+  headers, data: { email, password: PASSWORD, invitation_code: 'BETA' },
+ });
+ expect(registration.status()).toBe(201);
+ async function signIn() {
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+ }
+ await page.goto('/auth/signin');
+ await signIn();
+ await expect(page).toHaveURL(ORIGIN + '/projects');
+ await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
+ const response = await page.request.post('/api/projects', { headers, data: { name: 'Landing project' } });
+ expect(response.status()).toBe(201);
+ const project = await response.json();
+ await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+ await expect(page).toHaveURL(/\/auth\/signin$/);
+ const target = `/projects/${project.id}/tools`;
+ await page.goto('/auth/signin?callbackUrl=' + encodeURIComponent(target));
+ await signIn();
+ await expect(page).toHaveURL(ORIGIN + target);
+ await expect(page.getByRole('heading', { name: 'Tools', exact: true })).toBeVisible();
 });

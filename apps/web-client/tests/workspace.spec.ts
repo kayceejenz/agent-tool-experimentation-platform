@@ -5,8 +5,12 @@ test('empty workspace has no sample data or project-scoped links', async ({
 	page,
 }) => {
 	await page.goto('/');
+	await expect(page).toHaveURL(/\/projects$/);
 	await expect(
 		page.getByRole('heading', { name: 'Workspace overview' }),
+	).toHaveCount(0);
+	await expect(
+		page.getByRole('heading', { name: 'Projects', exact: true }),
 	).toBeVisible();
 	await expect(
 		page.getByRole('heading', { name: 'No projects yet' }),
@@ -53,6 +57,8 @@ test('empty workspace has no sample data or project-scoped links', async ({
 
 test('every sidebar destination renders a real page', async ({ page }) => {
 	await page.goto('/');
+	await expect(page).toHaveURL(/\/projects$/);
+	await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
 	const hrefs = await page
 		.getByRole('navigation', { name: 'Workspace navigation' })
 		.getByRole('link')

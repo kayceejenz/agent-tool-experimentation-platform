@@ -5,7 +5,7 @@ import {
 	ChevronDown,
 	FileCode2,
 	FolderKanban,
-	Home,
+	type LucideIcon,
 	Server,
 	Settings,
 	Workflow,
@@ -49,7 +49,7 @@ export function WorkspaceNavigation({
 	function navLink(
 		href: string | undefined,
 		label: string,
-		Icon: typeof Home,
+		Icon: LucideIcon,
 		exact = false,
 	) {
 		if (!href)

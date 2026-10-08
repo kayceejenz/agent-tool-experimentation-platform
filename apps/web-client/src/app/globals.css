@@ -362,14 +362,6 @@ p {
 .text-link:hover {
 	text-decoration: underline;
 }
-.welcome-panel {
-	position: relative;
-	overflow: hidden;
-	padding: var(--space-12);
-	background: var(--panel);
-	border: 1px solid var(--line);
-	border-radius: 12px;
-}
 .eyebrow {
 	color: var(--accent);
 	text-transform: uppercase;
@@ -377,94 +369,16 @@ p {
 	font-size: 10px;
 	font-weight: 600;
 }
-.welcome-panel h2 {
-	position: relative;
-	z-index: 1;
-	font-size: 36px;
-	font-weight: 500;
-	letter-spacing: -0.035em;
-	line-height: 1.15;
-	margin: var(--space-7) 0;
-}
-.welcome-panel p {
-	max-width: 490px;
-	color: var(--muted);
-	font-size: 14px;
-	position: relative;
-	z-index: 1;
-}
-.welcome-mark {
-	position: absolute;
-	right: 40px;
-	top: 45px;
-	color: var(--accent);
-	opacity: 0.12;
-	transform: rotate(-12deg);
-}
-.section-heading {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-top: var(--space-11);
-	margin-bottom: var(--space-7);
-}
-.section-heading h2,
 .panel-heading h2 {
 	margin: 0;
 	font-size: 16px;
 	font-weight: 500;
-}
-.section-heading > span {
-	color: var(--muted);
-	font-size: 12px;
-}
-.workflow-steps {
-	margin: 0;
-	padding: 0;
-	list-style: none;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	background: var(--panel);
-	overflow: hidden;
-}
-.workflow-step {
-	display: grid;
-	grid-template-columns: 28px minmax(0, 1fr);
-	gap: var(--space-7);
-	padding: var(--space-9) var(--space-10);
-}
-.workflow-step + .workflow-step {
-	border-top: 1px solid var(--line);
-}
-.workflow-step-number {
-	width: 28px;
-	height: 28px;
-	display: grid;
-	place-items: center;
-	border: 1px solid var(--line-strong);
-	border-radius: 50%;
-	color: var(--muted);
-	font-size: 12px;
-	font-variant-numeric: tabular-nums;
-}
-.workflow-step h3 {
-	margin: 0 0 var(--space-2);
-	font-size: 15px;
-	font-weight: 500;
-}
-.workflow-step p {
-	margin: 0;
-	font-size: 13px;
-	color: var(--muted);
 }
 .panel {
 	border: 1px solid var(--line);
 	border-radius: 12px;
 	background: var(--panel);
 	overflow: hidden;
-}
-.overview-projects {
-	margin-top: var(--space-11);
 }
 .panel-heading {
 	padding: var(--space-9) var(--space-9);
@@ -827,9 +741,6 @@ p {
 	.metric-grid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
-	.welcome-mark {
-		right: 18px;
-	}
 }
 .account-menu {
 	min-width: 0;
@@ -976,21 +887,6 @@ p {
 	}
 	.workspace-header p {
 		font-size: 14px;
-	}
-	.welcome-panel {
-		padding: var(--space-10);
-	}
-	.welcome-panel h2 {
-		font-size: 31px;
-	}
-	.welcome-mark {
-		right: -35px;
-	}
-	.workflow-step {
-		padding: var(--space-8);
-	}
-	.section-heading > span {
-		display: none;
 	}
 	.project-list > a {
 		padding: var(--space-8) var(--space-8);

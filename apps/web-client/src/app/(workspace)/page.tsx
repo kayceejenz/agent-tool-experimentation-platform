@@ -1,4 +1,5 @@
-import { Overview } from '@/components/workspace/workspace-views';
+import { redirect } from 'next/navigation';
+
 export default function Page() {
-	return <Overview />;
+	redirect('/projects');
 }

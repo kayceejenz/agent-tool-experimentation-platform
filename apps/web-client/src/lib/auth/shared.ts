@@ -1,5 +1,6 @@
 export const ACCESS_COOKIE = 'agent_access_token';
 export const REFRESH_COOKIE = 'agent_refresh_token';
+export const DEFAULT_CALLBACK = '/projects';
 
 export type AuthUser = {
 	id: string;
@@ -14,7 +15,7 @@ export function safeCallback(value: string | null | undefined): string {
 		value.startsWith('//') ||
 		/[\\\x00-\x1f]/.test(value)
 	)
-		return '/';
+		return DEFAULT_CALLBACK;
 	try {
 		const url = new URL(value, 'https://agent.invalid');
 		const path = decodeURIComponent(url.pathname);
@@ -25,9 +26,9 @@ export function safeCallback(value: string | null | undefined): string {
 			path.startsWith('//') ||
 			path.includes('\\')
 		)
-			return '/';
-		return url.pathname + url.search;
+			return DEFAULT_CALLBACK;
+		return path === '/' ? DEFAULT_CALLBACK : url.pathname + url.search;
 	} catch {
-		return '/';
+		return DEFAULT_CALLBACK;
 	}
 }

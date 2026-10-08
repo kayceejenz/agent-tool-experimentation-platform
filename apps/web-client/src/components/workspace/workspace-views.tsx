@@ -1,7 +1,7 @@
 import { ProjectRows } from '@/components/projects/project-list';
 import { ProjectSync } from '@/components/projects/project-provider';
 import Link from 'next/link';
-import { ArrowRight, Workflow } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { Project } from '@/types/workspace';
 
 export function PageHeader({
@@ -43,84 +43,6 @@ export function ProjectList() {
 	);
 }
 
-export function Overview() {
-	return (
-		<>
-			<PageHeader
-				title='Workspace overview'
-				description='Understand how your agents select tools and solve tasks.'>
-				<Link
-					className='button primary'
-					href='/projects'>
-					View projects <ArrowRight size={16} />
-				</Link>
-			</PageHeader>
-			<section className='welcome-panel'>
-				<span className='eyebrow'>
-					Agent experimentation
-				</span>
-				<h2>
-					From connected tools
-					<br />
-					to tested behavior.
-				</h2>
-				<p>
-					Connect your systems, configure an
-					agent, and inspect every step. Build
-					confidence through repeatable
-					experiments.
-				</p>
-				<Link className='text-link' href='/projects'>
-					View projects <ArrowRight size={16} />
-				</Link>
-				<div className='welcome-mark' aria-hidden>
-					<Workflow size={110} strokeWidth={1} />
-				</div>
-			</section>
-			<div className='section-heading'>
-				<h2>Your workflow</h2>
-				<span>Build one step at a time</span>
-			</div>
-			<ol className='workflow-steps'>
-				{[
-					{
-						title: 'Connect tools',
-						description:
-							'Discover what your systems can do.',
-					},
-					{
-						title: 'Configure agents',
-						description:
-							'Choose instructions, models, and tools.',
-					},
-					{
-						title: 'Run experiments',
-						description:
-							'Compare behavior against a benchmark.',
-					},
-				].map(({ title, description }, i) => (
-					<li
-						className='workflow-step'
-						key={title}>
-						<span className='workflow-step-number'>
-							{i + 1}
-						</span>
-						<div>
-							<h3>{title}</h3>
-							<p>{description}</p>
-						</div>
-					</li>
-				))}
-			</ol>
-			<section className='panel overview-projects'>
-				<div className='panel-heading'>
-					<h2>Projects</h2>
-				</div>
-				<ProjectRows />
-			</section>
-		</>
-	);
-}
 export function ProjectTabs({
 	project,
 	settings = false,
