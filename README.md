@@ -1,6 +1,14 @@
 # Agent Tool Experiment Platform
 
-A platform for connecting MCP servers, inspecting and testing tools, evaluating agent configurations, and promoting tested configurations into assistants.
+An agent and tool experimentation and evaluation platform for exploring MCP tools, testing them manually, and building versioned agents with MCP connectors and language models.
+
+The core workflow is to:
+
+- Connect MCP servers and discover their available tools and input schemas.
+- Test tools manually and inspect their inputs, outputs, and execution history.
+- Build versioned agents with prompts, selected MCP tools, model settings, and execution limits.
+- Run experiments and inspect execution traces to understand tool use and agent behavior.
+- Evaluate agent configurations and use the findings to refine subsequent versions.
 
 ## Get Started
 

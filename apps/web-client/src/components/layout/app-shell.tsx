@@ -37,7 +37,7 @@ export function AppShell({
 						className='rail-brand'
 						href='/projects'
 						onClick={() => setOpen(false)}>
-						kayceejenz.ai <span>Agent</span>
+						Agent Tool Experiment Platform
 					</Link>
 					<button
 						ref={menuButton}

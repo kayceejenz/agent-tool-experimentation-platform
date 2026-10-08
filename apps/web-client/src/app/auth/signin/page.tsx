@@ -140,7 +140,7 @@ function SignInContent() {
 				aria-busy={busy || undefined}>
 				<div className='signin-card-header'>
 					<div className='signin-brand'>
-						kayceejenz.ai <span>Agent</span>
+						Agent Tool Experiment Platform
 					</div>
 					<ThemeToggle disabled={busy} />
 				</div>
