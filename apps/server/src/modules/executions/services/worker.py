@@ -8,6 +8,7 @@ from integrations.agents.model_provider import configured_secrets
 from integrations.agents.runtime_errors import RuntimeStop
 from integrations.database import Database
 from integrations.mcp.credential_cipher import CredentialCipher
+from integrations.queue_notifications import QueueNotifications, wait_for_work
 
 from modules.agents.models.error_model import AgentError
 from modules.evaluations.repos.evaluation_repo import EvaluationRepository
@@ -62,15 +63,23 @@ async def serve():
         evaluator = Evaluator(
             EvaluationRepository(database, repository.secret), settings
         )
-        evaluation_task = asyncio.create_task(evaluator.serve())
-        while True:
-            if evaluation_task.done():
-                await evaluation_task
-            run = await repository.claim()
-            if run:
-                await supervise(runtime, repository, run)
-            else:
-                await asyncio.sleep(1)
+        async with QueueNotifications(settings) as notifications:
+            evaluation_task = asyncio.create_task(
+                evaluator.serve(notifications.evaluations)
+            )
+            # Surface evaluator failure even when the execution queue is idle.
+            evaluation_task.add_done_callback(lambda _: notifications.executions.set())
+            while True:
+                notifications.executions.clear()
+                if evaluation_task.done():
+                    await evaluation_task
+                if notifications.task.done():
+                    await notifications.task
+                run = await repository.claim()
+                if run:
+                    await supervise(runtime, repository, run)
+                else:
+                    await wait_for_work(notifications.executions)
     finally:
         if evaluation_task:
             evaluation_task.cancel()

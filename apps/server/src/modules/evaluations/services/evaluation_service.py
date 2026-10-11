@@ -8,6 +8,7 @@ from integrations.agents.model_provider import (
     provider_options,
 )
 from integrations.agents.runtime_errors import model_failure
+from integrations.queue_notifications import wait_for_work
 from langchain_openai import ChatOpenAI
 from langsmith import tracing_context
 from pydantic import ValidationError
@@ -175,10 +176,14 @@ class Evaluator:
                 )
         return result
 
-    async def serve(self):
+    async def serve(self, wakeup=None):
+        wakeup = wakeup if wakeup is not None else asyncio.Event()
         while True:
+            # Clear before querying so a notification arriving during claim
+            # remains set when the queue is empty and we begin waiting.
+            wakeup.clear()
             job = await self.repository.claim()
             if job:
                 await self.execute(job)
             else:
-                await asyncio.sleep(1)
+                await wait_for_work(wakeup)
