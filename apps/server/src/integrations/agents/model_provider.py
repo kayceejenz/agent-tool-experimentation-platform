@@ -26,4 +26,8 @@ def provider_options(settings, provider):
 
 
 def configured_secrets(settings):
-    return tuple(key.get_secret_value() for key in (settings.openai_api_key, settings.google_api_key) if key)
+    return tuple(
+        key.get_secret_value()
+        for key in (settings.openai_api_key, settings.google_api_key)
+        if key
+    )
