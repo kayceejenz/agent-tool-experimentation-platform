@@ -245,8 +245,9 @@ def test_evaluation_is_bounded_and_independent_of_execution(mode):
         )
 
 
+@pytest.mark.parametrize("provider", ["openai", "google"])
 @pytest.mark.parametrize("mode", ["valid", "truncated", "refused", "wrong_name"])
-def test_real_sdk_structured_output_with_synthetic_transport(mode):
+def test_real_sdk_structured_output_with_synthetic_transport(mode, provider):
     import json
 
     import httpx
@@ -259,6 +260,7 @@ def test_real_sdk_structured_output_with_synthetic_transport(mode):
     captured = []
 
     def respond(request):
+        assert request.url.host == ("generativelanguage.googleapis.com" if provider == "google" else "api.openai.com")
         body = json.loads(request.content)
         captured.append(body)
         message = {"role": "assistant", "content": json.dumps(report)}
@@ -291,9 +293,11 @@ def test_real_sdk_structured_output_with_synthetic_transport(mode):
     async def execute():
         async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
             model = ChatOpenAI(
-                model="gpt-4.1-mini",
+                model="gemini-2.5-flash" if provider == "google" else "gpt-4.1-mini",
                 api_key="synthetic-key",
                 max_retries=0,
+                use_responses_api=False,
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/" if provider == "google" else "https://api.openai.com/v1",
                 http_async_client=client,
             )
             repo = Repository(run, spans)

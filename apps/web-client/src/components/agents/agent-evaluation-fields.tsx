@@ -2,6 +2,7 @@
 import { ClipboardCheck } from 'lucide-react';
 import type { useAgentEditor } from './use-agent-editor';
 import { PromptPicker } from './prompt-picker';
+import { ModelSelect } from './model-select';
 
 type Props = Pick<ReturnType<typeof useAgentEditor>, 'form' | 'field' | 'evaluationPrompt' | 'setEvaluationPrompt' | 'setPickerBusy' | 'disabled'> & { projectId: string };
 const dimensions = ['Task completion', 'Tool selection', 'Tool inputs', 'Use of results', 'Answer quality', 'Efficiency', 'Write handling'];
@@ -24,12 +25,10 @@ export function AgentEvaluationFields({ form, field, evaluationPrompt, setEvalua
             <div className='evaluation-dimensions'>{dimensions.map(name => <span key={name}>{name}</span>)}</div>
             <p>Each finding links to the recorded evidence. Missing evidence is marked unknown.</p>
         </div>
-        <label className='tool-field'>Evaluator model
-            <input value={profile.model ?? ''} maxLength={160} disabled={disabled}
-                placeholder={form.model_settings.model || 'Use the agent model'}
-                onChange={e => field('evaluation_profile', { ...profile, model: e.target.value || null })} />
-            <small>Leave empty to use the agent’s model. Each evaluation uses additional model tokens.</small>
-        </label>
+        <ModelSelect label='Evaluator model' value={profile.model ?? ''} disabled={disabled}
+            inherit={`Use agent model${form.model_settings.model ? ` (${form.model_settings.model})` : ''}`}
+            onChange={model => field('evaluation_profile', { ...profile, model: model || null })} />
+        <p className='mcp-note'>Each evaluation uses additional model tokens.</p>
         <details className='evaluation-custom-rubric' open={!!evaluationPrompt}>
             <summary>Additional evaluation instructions <span>{evaluationPrompt ? `${evaluationPrompt.name} · v${evaluationPrompt.revision}` : 'Optional'}</span></summary>
             <p className='mcp-note'>Add domain-specific checks to the standard rubric. The selected revision is saved with this agent.</p>

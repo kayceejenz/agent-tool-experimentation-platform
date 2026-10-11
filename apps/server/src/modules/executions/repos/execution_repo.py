@@ -7,7 +7,7 @@ from psycopg.types.json import Jsonb
 
 from modules.agents.models.error_model import AgentError
 from modules.agents.repos.agent_repo import AgentRepository
-from modules.tools.helpers.validation import redact
+from modules.tools.helpers.validation import redact, redact_text
 
 
 def json_value(value):
@@ -60,9 +60,9 @@ class ExecutionRepository:
                     raise AgentError(
                         409, "Enable a ready, current agent revision before running"
                     )
-                if detail["model_settings"]["provider"].lower() != "openai":
+                if detail["model_settings"]["provider"].lower() not in ("openai", "google"):
                     raise AgentError(
-                        422, "The first runtime supports the OpenAI provider"
+                        422, "The runtime supports OpenAI and Google providers"
                     )
                 pending = await (
                     await db.execute(
@@ -107,7 +107,7 @@ class ExecutionRepository:
                 # Preserve keys so redaction cannot change argument semantics.
                 if self.secret:
                     snapshot["tools"] = json.loads(
-                        json.dumps(snapshot["tools"]).replace(self.secret, "[redacted]")
+                        redact_text(json.dumps(snapshot["tools"]), self.secret)
                     )
                 return await (
                     await db.execute(
@@ -303,9 +303,7 @@ class ExecutionRepository:
             await conn.execute(
                 "UPDATE agent_platform.execution_spans SET model_visible_output=%s WHERE id=%s",
                 (
-                    content.replace(self.secret, "[redacted]")
-                    if self.secret
-                    else content,
+                    redact_text(content, self.secret),
                     span_id,
                 ),
             )

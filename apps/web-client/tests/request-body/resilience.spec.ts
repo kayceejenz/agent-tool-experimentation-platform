@@ -308,3 +308,28 @@ test('evaluation empty, queued, failed and history states stay actionable', asyn
     await expect(panel.getByRole('alert')).toContainText('Check the provider account');
     await expect(page.locator('.execution-answer')).toContainText('Completed answer');
 });
+
+test('model dropdowns offer both providers, cost guidance and evaluator inheritance', async ({ page }) => {
+    await page.goto(`/projects/${projectId}/agents`);
+    await page.getByRole('button', { name: 'Create agent', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: /Model$/ }).click();
+    const model = dialog.getByRole('combobox', { name: 'Model', exact: true });
+    await expect(model.locator('optgroup')).toHaveCount(2);
+    await model.selectOption('gemini-2.5-flash-lite');
+    await expect(dialog).toContainText('$0.10 input / $0.40 output');
+    await model.selectOption('gpt-4.1-mini');
+    await expect(dialog).toContainText('$0.40 input / $1.60 output');
+    await expect(model.locator('option:checked')).toContainText('Balanced');
+    await dialog.getByRole('button', { name: /Evaluation$/ }).click();
+    const evaluator = dialog.getByRole('combobox', { name: 'Evaluator model', exact: false });
+    await expect(evaluator).toHaveValue('');
+    await expect(evaluator.locator('option:checked')).toContainText('Use agent model (gpt-4.1-mini)');
+    await evaluator.selectOption('gemini-2.5-pro');
+    await expect(dialog).toContainText('prompts up to 200k tokens');
+    await evaluator.selectOption('');
+    await expect(evaluator).toHaveValue('');
+    await dialog.getByRole('button', { name: /Model$/ }).click();
+    await expect(model).toHaveValue('gpt-4.1-mini');
+    await page.screenshot({ path: '/tmp/agent-model-dropdown.png' });
+});

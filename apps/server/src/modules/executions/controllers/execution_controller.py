@@ -5,6 +5,7 @@ from api.dependencies import current_user
 from fastapi import APIRouter, Depends, Query, Request
 
 from modules.agents.models.error_model import AgentError
+from integrations.agents.model_provider import provider_key
 from modules.auth.models.auth_user_model import AuthenticatedUser
 from modules.executions.dtos.execution_dto import StartExecution
 
@@ -16,8 +17,13 @@ User = Annotated[AuthenticatedUser, Depends(current_user)]
 async def start(
     project_id: UUID, agent_id: UUID, body: StartExecution, user: User, request: Request
 ):
-    if request.app.state.settings.openai_api_key is None:
-        raise AgentError(503, "Set AGENT_OPENAI_API_KEY on the server to run agents")
+    agent = await request.app.state.agents.get(user.id, project_id, agent_id, body.revision)
+    provider = agent["model_settings"]["provider"].lower()
+    if provider not in ("openai", "google"):
+        raise AgentError(422, "The runtime supports OpenAI and Google providers")
+    if provider_key(request.app.state.settings, provider) is None:
+        variable = "AGENT_GOOGLE_API_KEY" if provider == "google" else "AGENT_OPENAI_API_KEY"
+        raise AgentError(503, f"Set {variable} on the server to run this agent")
     result = await request.app.state.executions.start(
         user.id, project_id, agent_id, body
     )

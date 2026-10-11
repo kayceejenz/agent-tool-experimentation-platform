@@ -8,6 +8,7 @@ from collections import Counter
 from integrations.agents.langchain_runtime import model_failure
 from modules.agents.models.error_model import AgentError
 from langchain_openai import ChatOpenAI
+from integrations.agents.model_provider import provider_for_model, provider_key, provider_options
 from langsmith import tracing_context
 from pydantic import ValidationError
 from modules.evaluations.dtos.evaluation_dto import CheckFinding, CriticalFailure, Report
@@ -56,6 +57,7 @@ def profile_snapshot(detail):
     return {
         **profile,
         "model": profile.get("model") or detail["model_settings"]["model"],
+        "provider": provider_for_model(profile["model"]) if profile.get("model") else detail["model_settings"].get("provider", "openai").lower(),
         "instructions": INSTRUCTIONS
         + ("\nAdditional rubric:\n" + prompt["content"] if prompt else ""),
         "rubric_version": RUBRIC_VERSION,
@@ -244,7 +246,8 @@ class Evaluator:
                     job, "completed", metrics, report, evidence_hash
                 )
                 return
-            if not self.settings.openai_api_key and not self.model_factory:
+            provider = profile.get("provider") or provider_for_model(profile["model"])
+            if not provider_key(self.settings, provider) and not self.model_factory:
                 await self.repository.finish(
                     job,
                     "failed",
@@ -259,7 +262,7 @@ class Evaluator:
                 if self.model_factory
                 else ChatOpenAI(
                     model=profile["model"],
-                    api_key=self.settings.openai_api_key,
+                    **provider_options(self.settings, provider),
                     max_tokens=profile["max_output_tokens"],
                     timeout=profile["timeout_seconds"],
                     max_retries=0,

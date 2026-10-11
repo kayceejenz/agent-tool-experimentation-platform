@@ -3,6 +3,7 @@
 import asyncio
 
 from core.settings import Settings
+from integrations.agents.model_provider import configured_secrets
 from integrations.agents.langchain_runtime import LangChainRuntime, RuntimeStop
 from integrations.database import Database
 from integrations.mcp.credential_cipher import CredentialCipher
@@ -44,7 +45,7 @@ async def serve():
     database = Database(settings)
     repository = ExecutionRepository(
         database,
-        settings.openai_api_key.get_secret_value() if settings.openai_api_key else None,
+        configured_secrets(settings),
     )
     executor = ToolService(
         ToolRepository(database),

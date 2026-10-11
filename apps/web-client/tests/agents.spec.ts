@@ -79,8 +79,7 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 		}),
 	).toHaveValue('1');
 	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
-	await dialog.getByLabel('Provider', { exact: true }).fill('example');
-	await dialog.getByLabel('Model identifier').fill('demo');
+	await dialog.getByRole('combobox', { name: 'Model', exact: true }).selectOption('gpt-4.1-mini');
 	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
 	await dialog.getByRole('checkbox', { name: /describe_store/ }).check();
 	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
@@ -103,7 +102,7 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 	await dialog
 		.getByRole('button', { name: 'View revision 2', exact: true })
 		.click();
-	await expect(dialog.locator('.agent-preview')).toContainText('demo');
+	await expect(dialog.locator('.agent-preview')).toContainText('gpt-4.1-mini');
 	await page.keyboard.press('Escape');
 	await page.reload();
 	await expect(

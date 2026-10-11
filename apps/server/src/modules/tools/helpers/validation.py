@@ -8,6 +8,13 @@ SENSITIVE = re.compile(
 )
 
 
+def redact_text(value, secret=None):
+    for key in (secret if isinstance(secret, tuple) else (secret,)):
+        if key:
+            value = value.replace(key, "[redacted]")
+    return value
+
+
 def redact(value, secret=None):
     if isinstance(value, dict):
         return {
@@ -17,8 +24,7 @@ def redact(value, secret=None):
     if isinstance(value, list):
         return [redact(item, secret) for item in value]
     if isinstance(value, str):
-        if secret:
-            value = value.replace(secret, "[redacted]")
+        value = redact_text(value, secret)
         # MCP text content often embeds JSON; redact its sensitive fields too.
         try:
             parsed = json.loads(value)

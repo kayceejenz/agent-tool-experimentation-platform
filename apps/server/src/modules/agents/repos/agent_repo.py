@@ -58,12 +58,16 @@ class AgentRepository:
                     )
         reference = body.evaluation_profile.prompt
         if reference:
-            row = await (await db.execute(
-                "SELECT p.type FROM agent_platform.prompts p JOIN agent_platform.prompt_revisions r ON r.prompt_id=p.id WHERE p.project_id=%s AND p.id=%s AND r.revision=%s",
-                (project_id, reference.id, reference.revision),
-            )).fetchone()
+            row = await (
+                await db.execute(
+                    "SELECT p.type FROM agent_platform.prompts p JOIN agent_platform.prompt_revisions r ON r.prompt_id=p.id WHERE p.project_id=%s AND p.id=%s AND r.revision=%s",
+                    (project_id, reference.id, reference.revision),
+                )
+            ).fetchone()
             if not row or row["type"] != "evaluation":
-                raise AgentError(422, "Select an evaluation prompt revision in this project")
+                raise AgentError(
+                    422, "Select an evaluation prompt revision in this project"
+                )
         for tool in body.tools:
             row = await (
                 await db.execute(
@@ -127,10 +131,12 @@ class AgentRepository:
         result["evaluation_prompt"] = None
         reference = row["evaluation_profile"].get("prompt")
         if reference:
-            result["evaluation_prompt"] = await (await db.execute(
-                "SELECT p.id,p.current_revision AS latest_revision,r.revision,r.name,r.content FROM agent_platform.prompts p JOIN agent_platform.prompt_revisions r ON r.prompt_id=p.id WHERE p.id=%s AND r.revision=%s",
-                (reference["id"], reference["revision"]),
-            )).fetchone()
+            result["evaluation_prompt"] = await (
+                await db.execute(
+                    "SELECT p.id,p.current_revision AS latest_revision,r.revision,r.name,r.content FROM agent_platform.prompts p JOIN agent_platform.prompt_revisions r ON r.prompt_id=p.id WHERE p.id=%s AND r.revision=%s",
+                    (reference["id"], reference["revision"]),
+                )
+            ).fetchone()
         issues = []
         for kind in ("system", "agent"):
             identifier = row[kind + "_prompt_id"]
@@ -171,7 +177,8 @@ class AgentRepository:
             tools=tools,
             configuration_issues=issues,
             configuration_ready=not issues,
-            runtime_available=row["model_settings"]["provider"].lower() == "openai",
+            runtime_available=row["model_settings"]["provider"].lower()
+            in ("openai", "google"),
         )
         return result
 
@@ -252,7 +259,13 @@ class AgentRepository:
 
                 configuration = {
                     key: current[key]
-                    for key in ("name", "description", "model_settings", "limits", "evaluation_profile")
+                    for key in (
+                        "name",
+                        "description",
+                        "model_settings",
+                        "limits",
+                        "evaluation_profile",
+                    )
                 }
                 configuration.update(
                     system_prompt=reference(current["system_prompt"]),

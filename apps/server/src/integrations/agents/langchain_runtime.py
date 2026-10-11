@@ -9,6 +9,7 @@ from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 from langchain_openai import ChatOpenAI
+from integrations.agents.model_provider import provider_options, configured_secrets
 from langsmith import tracing_context
 from modules.agents.models.error_model import AgentError
 from modules.mcp_servers.models.error_model import McpConnectionError
@@ -373,19 +374,21 @@ class LangChainRuntime:
     def model(self, snapshot):
         if self.model_factory:
             return self.model_factory(snapshot)
-        if self.settings.openai_api_key is None:
-            raise RuntimeStop("provider_not_configured")
         config = snapshot["model_settings"]
+        try:
+            options = provider_options(self.settings, config["provider"].lower())
+        except ValueError:
+            raise RuntimeStop("provider_not_configured") from None
         kwargs = {
             "model": config["model"],
-            "api_key": self.settings.openai_api_key,
+            **options,
             "max_tokens": snapshot["limits"]["max_output_tokens"],
             "max_retries": 0,
             "timeout": snapshot["limits"]["timeout_seconds"],
         }
         if config.get("temperature") is not None:
             kwargs["temperature"] = config["temperature"]
-        return ChatOpenAI(**kwargs, model_kwargs={"parallel_tool_calls": False})
+        return ChatOpenAI(**kwargs, model_kwargs={"parallel_tool_calls": False} if config["provider"].lower() == "openai" else {})
 
     async def execute(self, run):
         status, reason, answer = "failed", "runtime_error", None
@@ -395,9 +398,7 @@ class LangChainRuntime:
                 run,
                 self.repository,
                 self.executor,
-                self.settings.openai_api_key.get_secret_value()
-                if self.settings.openai_api_key
-                else None,
+                configured_secrets(self.settings),
             )
             tools = [
                 StructuredTool(

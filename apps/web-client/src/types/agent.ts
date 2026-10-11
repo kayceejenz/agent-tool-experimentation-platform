@@ -63,7 +63,7 @@ export type Agent = Omit<AgentSummary, 'tool_count'> & {
 	limits: AgentConfig['limits'];
 	configuration_issues: string[];
 	configuration_ready: boolean;
-	runtime_available: false;
+	runtime_available: boolean;
 };
 
 export type AgentPage = { items: AgentSummary[]; next_offset: number | null };

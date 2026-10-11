@@ -1,3 +1,4 @@
+from integrations.agents.model_provider import configured_secrets
 from modules.evaluations.controllers.evaluation_controller import router as evaluations_router
 from modules.evaluations.repos.evaluation_repo import EvaluationRepository
 from modules.agents.controllers.agent_controller import router as agents_router
@@ -96,8 +97,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 config.login_rate_window_seconds,
             )
         instance.state.agents = AgentRepository(database)
-        instance.state.executions = ExecutionRepository(database, config.openai_api_key.get_secret_value() if config.openai_api_key else None)
-        instance.state.evaluations = EvaluationRepository(database, config.openai_api_key.get_secret_value() if config.openai_api_key else None)
+        instance.state.executions = ExecutionRepository(database, configured_secrets(config))
+        instance.state.evaluations = EvaluationRepository(database, configured_secrets(config))
         instance.state.prompts = PromptRepository(database)
         instance.state.database = database
         instance.state.projects = ProjectService(ProjectRepository(database))

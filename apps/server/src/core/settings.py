@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8001, ge=1, le=65535)
     openai_api_key: SecretStr | None = None
+    google_api_key: SecretStr | None = None
 
-    @field_validator("openai_api_key", mode="before")
+    @field_validator("openai_api_key", "google_api_key", mode="before")
     @classmethod
     def empty_openai_key(cls, value):
         return None if value == "" else value
