@@ -15,7 +15,7 @@ export function PromptPicker({
 	onBusyChange,
 }: {
 	projectId: string;
-	kind: 'system' | 'agent';
+	kind: 'system' | 'agent' | 'evaluation';
 	value: PromptBinding | null;
 	disabled: boolean;
 	onChange: (value: PromptBinding | null) => void;
@@ -105,7 +105,7 @@ export function PromptPicker({
 			onBusyChange(false);
 		}
 	}
-	const label = kind === 'system' ? 'System prompt' : 'Agent prompt';
+	const label = kind === 'system' ? 'System prompt' : kind === 'agent' ? 'Agent prompt' : 'Evaluation prompt';
 	const options =
 		value && !choices.some(p => p.id === value.id)
 			? [value, ...choices]

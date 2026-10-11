@@ -2,11 +2,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from modules.evaluations.dtos.evaluation_dto import Expectations
+
 
 class StartExecution(BaseModel):
     model_config = ConfigDict(extra="forbid")
     revision: int = Field(ge=1, strict=True)
     request_id: UUID
+    expectations: Expectations | None = None
     input: str = Field(min_length=1, max_length=16000)
 
     @field_validator("input")

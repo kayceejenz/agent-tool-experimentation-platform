@@ -102,7 +102,7 @@ export function assertProjectPayload(
 	const positive = (v: unknown) => Number.isInteger(v) && Number(v) > 0;
 	const text = (v: unknown) => typeof v === 'string' && v.length > 0;
 	const catalog =
-		/\/(tools|prompts|spans)$/.test(route) && method === 'GET';
+		/\/(tools|prompts|spans|evaluations)$/.test(route) && method === 'GET';
 	if (catalog && !('items' in value)) return invalid();
 	if ('items' in value) {
 		if (
@@ -154,6 +154,19 @@ export function assertProjectPayload(
 			)
 		)
 			return invalid();
+        if (route.endsWith('/evaluations')) {
+            if (!('next_offset' in value)) return invalid();
+            const finding = (item: unknown) => isRecord(item) && text(item.name) && text(item.reason)
+                && Array.isArray(item.evidence_refs) && item.evidence_refs.every(ref => typeof ref === 'string');
+            for (const item of value.items) {
+                if (!isRecord(item) || !positive(item.attempt) || !['queued', 'running', 'completed', 'failed'].includes(String(item.status))
+                    || !isRecord(item.profile) || !text(item.profile.model) || !positive(item.profile.rubric_version)) return invalid();
+                if (item.report !== null && (!isRecord(item.report) || !text(item.report.task_outcome) || !text(item.report.overall_verdict)
+                    || !['checks', 'requirements', 'critical_failures'].every(key => Array.isArray(item.report && (item.report as Record<string, unknown>)[key]) && ((item.report as Record<string, unknown>)[key] as unknown[]).every(finding))
+                    || !Array.isArray(item.report.limitations) || !item.report.limitations.every(text))) return invalid();
+                if (item.metrics !== null && (!isRecord(item.metrics) || !isRecord(item.metrics.usage_counts) || !Array.isArray(item.metrics.assertions))) return invalid();
+            }
+        }
 		return;
 	}
 	if (/\/executions\/[^/]+(?:\/cancel)?$/.test(route)) {

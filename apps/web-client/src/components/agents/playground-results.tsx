@@ -1,6 +1,7 @@
 'use client';
 import type { useAgentPlayground } from './use-agent-playground';
 import { Check, Copy } from 'lucide-react';
+import { ExecutionEvaluation } from './execution-evaluation';
 import { ExecutionTrace } from './execution-trace';
 
 type Props = Pick<ReturnType<typeof useAgentPlayground>, 'editTask'
@@ -36,7 +37,7 @@ export function PlaygroundResults({
 		className='playground-results'
 		aria-label='Execution stack'
 		key={run.id}>
-		<div className='playground-task-message'>
+		<div className='playground-task-message' id={`execution-task-${run.id}`}>
 			<span className='playground-message-label'>
 				Your task
 			</span>
@@ -121,7 +122,7 @@ export function PlaygroundResults({
 			</div>
 		</div>
 		{run.final_answer ? (
-			<div className='execution-answer'>
+			<div className='execution-answer' id={`execution-answer-${run.id}`}>
 				<p>
 					{run.final_answer}
 				</p>
@@ -175,6 +176,7 @@ export function PlaygroundResults({
 				)}
 			</div>
 		)}
+		{!pending && <ExecutionEvaluation key={run.id} path={`${base}/executions/${run.id}`} canEvaluate={canRun} />}
 		<details
 			className='playground-details'
 			open={showDetails}

@@ -56,6 +56,14 @@ class AgentRepository:
                     raise AgentError(
                         422, "Select a matching prompt revision in this project"
                     )
+        reference = body.evaluation_profile.prompt
+        if reference:
+            row = await (await db.execute(
+                "SELECT p.type FROM agent_platform.prompts p JOIN agent_platform.prompt_revisions r ON r.prompt_id=p.id WHERE p.project_id=%s AND p.id=%s AND r.revision=%s",
+                (project_id, reference.id, reference.revision),
+            )).fetchone()
+            if not row or row["type"] != "evaluation":
+                raise AgentError(422, "Select an evaluation prompt revision in this project")
         for tool in body.tools:
             row = await (
                 await db.execute(
@@ -70,7 +78,7 @@ class AgentRepository:
     async def insert(db, agent_id, revision, user_id, body):
         system, agent = body.system_prompt, body.agent_prompt
         await db.execute(
-            "INSERT INTO agent_platform.agent_revisions(agent_id,revision,name,description,system_prompt_id,system_prompt_revision,agent_prompt_id,agent_prompt_revision,model_settings,limits,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "INSERT INTO agent_platform.agent_revisions(agent_id,revision,name,description,system_prompt_id,system_prompt_revision,agent_prompt_id,agent_prompt_revision,model_settings,limits,created_by,evaluation_profile) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 agent_id,
                 revision,
@@ -83,6 +91,7 @@ class AgentRepository:
                 Jsonb(body.model_settings.model_dump()),
                 Jsonb(body.limits.model_dump()),
                 user_id,
+                Jsonb(body.evaluation_profile.model_dump(mode="json")),
             ),
         )
         for tool in body.tools:
@@ -111,9 +120,17 @@ class AgentRepository:
             "description": row["description"],
             "model_settings": row["model_settings"],
             "limits": row["limits"],
+            "evaluation_profile": row["evaluation_profile"],
             "created_at": row["created_at"],
             "created_by": row["created_by"],
         }
+        result["evaluation_prompt"] = None
+        reference = row["evaluation_profile"].get("prompt")
+        if reference:
+            result["evaluation_prompt"] = await (await db.execute(
+                "SELECT p.id,p.current_revision AS latest_revision,r.revision,r.name,r.content FROM agent_platform.prompts p JOIN agent_platform.prompt_revisions r ON r.prompt_id=p.id WHERE p.id=%s AND r.revision=%s",
+                (reference["id"], reference["revision"]),
+            )).fetchone()
         issues = []
         for kind in ("system", "agent"):
             identifier = row[kind + "_prompt_id"]
@@ -235,7 +252,7 @@ class AgentRepository:
 
                 configuration = {
                     key: current[key]
-                    for key in ("name", "description", "model_settings", "limits")
+                    for key in ("name", "description", "model_settings", "limits", "evaluation_profile")
                 }
                 configuration.update(
                     system_prompt=reference(current["system_prompt"]),

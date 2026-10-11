@@ -25,6 +25,16 @@ test('inspect tool lineage, context links, saved snapshots and execution history
 		{ id: tool, sequence: 2, parent_id: first, kind: 'tool', name: 'Store / lookup', status: 'success', call_id: 'call-abc', tool_revision: 1, tool_execution_id: 'executor-record', context_span_ids: [], inputs: { sku: 'ABC' }, outputs: { price: 29, currency: 'GBP' }, duration_ms: 80 },
 		{ id: final, sequence: 3, parent_id: null, kind: 'model', name: 'Model turn 2', status: 'success', context_span_ids: [tool], inputs: { message_count: 3 }, outputs: [{ text: 'Product ABC costs £29.' }], duration_ms: 130 },
 	] };
+    const evaluation = {
+        id: '55555555-5555-4555-8555-555555555555', attempt: 1, status: 'completed', error_code: null,
+        profile: { model: 'fixture-judge', rubric_version: 1, prompt: null },
+        metrics: { model_turns: 2, tool_calls: 1, elapsed_ms: 1000,
+            usage_counts: { input_count: 100, output_count: 20, missing_usage_turns: 0 }, assertions: [] },
+        usage: { input_count: 80, output_count: 30 },
+        report: { task_outcome: 'completed', overall_verdict: 'pass', critical_failures: [], limitations: [],
+            requirements: [{ name: 'Find price', status: 'pass', reason: 'Returned the requested price.', evidence_refs: [tool] }],
+            checks: [{ name: 'output_use', status: 'pass', reason: 'The answer matches the lookup result.', evidence_refs: [tool] }] },
+    };
 	await page.route(`**${base}/agents/${agent.id}/executions`, async (route) => {
 		if (route.request().method() === 'POST') {
 			expect(route.request().postDataJSON().input).toBe('Find price');
@@ -34,6 +44,7 @@ test('inspect tool lineage, context links, saved snapshots and execution history
 	await page.route(`**${base}/executions/${runId}**`, (route) => {
         const path = new URL(route.request().url()).pathname;
         const { snapshot, spans, ...overview } = run;
+        if (path.endsWith('/evaluations')) return route.fulfill({ json: { items: [evaluation], next_offset: null } });
         if (path.endsWith('/snapshot')) return route.fulfill({ json: { snapshot } });
         if (path.endsWith('/spans')) return route.fulfill({ json: { items: spans.map(span => ({ id: span.id, sequence: span.sequence, parent_id: span.parent_id, kind: span.kind, name: span.name, status: span.status, context_span_ids: span.context_span_ids, duration_ms: span.duration_ms, error_code: null, call_id: span.call_id ?? null, tool_revision: span.tool_revision ?? null, tool_execution_id: span.tool_execution_id ?? null })), next_offset: null } });
         const span = spans.find(span => path.endsWith(`/spans/${span.id}`));
@@ -57,12 +68,17 @@ test('inspect tool lineage, context links, saved snapshots and execution history
 	await page.screenshot({ path: 'test-results/playground-composer-desktop.png' });
 	await dialog.getByLabel('Task', { exact: true }).fill('Find price');
 	await dialog.getByLabel('Task', { exact: true }).press('Control+Enter');
-	await expect(dialog.getByRole('status')).toContainText('completed');
+	await expect(dialog.locator('.playground-run-heading [role=status]')).toContainText('completed');
 	await expect(dialog.locator('.execution-answer')).toContainText('Product ABC costs £29.');
+    await expect(dialog.locator('.evaluation-panel')).toContainText('Task outcomeCompleted');
+    await expect(dialog.locator('.evaluation-panel')).toContainText('fixture-judge');
+    await dialog.locator('.evaluation-finding').first().locator('summary').click();
+    await dialog.locator('.evaluation-evidence').first().locator('summary').click();
+    await expect(dialog.locator('.evaluation-evidence pre').last()).toContainText('GBP');
 	await expect(dialog.locator('.execution-span')).toHaveCount(0);
 	await expect(dialog.getByRole('button', { name: 'Copy answer' })).toBeVisible();
 	await page.screenshot({ path: 'test-results/playground-answer-desktop.png' });
-	await dialog.locator('.playground-details > summary').click();
+	await dialog.locator('.playground-details:not(.evaluation-panel) > summary').click();
 	await expect(dialog.locator('.execution-turn').first().locator('.execution-children')).toContainText('Store / lookup');
 	await dialog.locator(`#span-${final} > summary`).click();
 	await dialog.getByRole('link', { name: '#2 Store / lookup' }).click();
@@ -99,9 +115,9 @@ test('inspect tool lineage, context links, saved snapshots and execution history
 		await route.fulfill({ json: run });
 	});
 	await dialog.getByRole('button', { name: 'Run task', exact: true }).click();
-	await expect(dialog.getByRole('status')).toContainText('running');
+	await expect(dialog.locator('.playground-run-heading [role=status]')).toContainText('running');
 	await dialog.getByRole('button', { name: 'Stop', exact: true }).click();
-	await expect(dialog.getByRole('status')).toContainText('cancelled');
+	await expect(dialog.locator('.playground-run-heading [role=status]')).toContainText('cancelled');
 	await expect(dialog.getByRole('heading', { name: 'Task stopped' })).toBeVisible();
 	await dialog.getByRole('button', { name: 'New task', exact: true }).click();
 	await expect(dialog.getByLabel('Task', { exact: true })).toHaveValue('');

@@ -12,6 +12,7 @@ export type ExecutionSpan = {
 	context_span_ids: string[];
 	inputs: unknown;
 	outputs: unknown;
+	model_visible_output?: string | null;
 	error_code: string | null;
 	duration_ms: number | null;
 };

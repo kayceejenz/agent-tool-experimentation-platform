@@ -44,6 +44,7 @@ const endpoints = [
 	[`${base}/agents/${item}/revisions`, 'POST', BODY_LIMITS.configuration],
 	[`${base}/agents/${item}/executions`, 'POST', BODY_LIMITS.execution],
 	[`${base}/executions/${item}/cancel`, 'POST', BODY_LIMITS.control],
+	[`${base}/executions/${item}/evaluations`, 'POST', BODY_LIMITS.execution],
 ] as const;
 
 for (const [path, method, limit] of endpoints) {

@@ -25,12 +25,19 @@ class Limits(StrictModel):
     max_output_tokens: int = Field(default=2048, ge=1, le=32000, strict=True)
 
 
+class EvaluationProfile(StrictModel):
+    enabled: bool = Field(default=True, strict=True)
+    prompt: Reference | None = None
+    model: str | None = Field(default=None, min_length=1, max_length=160, pattern=r"^[a-zA-Z0-9_./:-]+$")
+
+
 class AgentConfiguration(StrictModel):
     name: str = Field(min_length=1, max_length=160)
     description: str = Field(default="", max_length=2000)
     system_prompt: Reference | None = None
     agent_prompt: Reference | None = None
     model_settings: ModelSettings = Field(default_factory=ModelSettings)
+    evaluation_profile: EvaluationProfile = Field(default_factory=EvaluationProfile)
     tools: list[Reference] = Field(default_factory=list, max_length=200)
     limits: Limits = Field(default_factory=Limits)
 

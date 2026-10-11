@@ -603,3 +603,56 @@
 		animation: none;
 	}
 }
+
+@media (max-width: 640px) {
+	.root :global(.playground-details.evaluation-panel > summary > span) {
+		margin-left: auto;
+		flex-basis: auto;
+	}
+}
+
+.root :global(.evaluation-summary-status) {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.root :global(.evaluation-summary-status small) {
+	font-size: 12px;
+	font-weight: 400;
+}
+.root :global(.evaluation-section > summary) {
+	cursor: pointer;
+	padding: 12px 0;
+	font-size: 13px;
+	font-weight: 500;
+}
+.root :global(.evaluation-section > summary > span) {
+	margin-left: 8px;
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 400;
+}
+.root :global(.playground-task-message) {
+	padding: 14px 18px;
+	margin-bottom: 24px;
+}
+.root :global(.playground-task-preview) {
+	-webkit-line-clamp: 2;
+}
+.root :global(.playground-details) {
+	margin-top: 24px;
+	padding-top: 16px;
+}
+.root :global(.playground-details > summary:focus-visible),
+.root :global(.evaluation-section > summary:focus-visible) {
+	outline: 2px solid var(--accent);
+	outline-offset: 4px;
+	border-radius: 4px;
+}
+@media (max-width: 640px) {
+	.root :global(.evaluation-summary-status) {
+		gap: 6px;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+}

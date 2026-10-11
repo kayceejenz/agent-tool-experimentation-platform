@@ -12,20 +12,7 @@ type Props = Pick<ReturnType<typeof useAgentEditor>, 'system'
 export function AgentPromptsFields({ system, setSystem, agentPrompt, setAgentPrompt, setPickerBusy, disabled, projectId }: Props) {
 	return (
 		<>
-			<p className='mcp-note'>
-				Select
-				exact
-				revisions.
-				Evaluation
-				prompts
-				belong
-				to
-				experiment
-				evaluation,
-				not
-				agent
-				instructions.
-			</p>
+			<p className='mcp-note'>Select the prompt revisions the agent will use for this task.</p>
 			<PromptPicker
 				projectId={projectId}
 				kind='system'
@@ -42,6 +29,7 @@ export function AgentPromptsFields({ system, setSystem, agentPrompt, setAgentPro
 				onChange={setAgentPrompt}
 				onBusyChange={setPickerBusy}
 			/>
+
 		</>
 	);
 }

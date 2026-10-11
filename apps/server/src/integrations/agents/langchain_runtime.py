@@ -310,6 +310,8 @@ class ExecutionMiddleware(AgentMiddleware):
                     if len(content) > MAX_TOOL_CONTEXT_CHARS:
                         self.stop_reason = "tool_result_too_large"
                         raise RuntimeStop(self.stop_reason)
+                    if hasattr(self.repository, "record_observation"):
+                        await self.repository.record_observation(span, content)
                     return ToolMessage(
                         content=content,
                         tool_call_id=call["id"],
@@ -349,8 +351,11 @@ class ExecutionMiddleware(AgentMiddleware):
                 span, result["status"], result, result["error_code"]
             )
             self.context_spans.append(span)
+            content = model_tool_result(result, self.secret)
+            if hasattr(self.repository, "record_observation"):
+                await self.repository.record_observation(span, content)
             return ToolMessage(
-                content=model_tool_result(result, self.secret),
+                content=content,
                 tool_call_id=call["id"],
                 status="error",
             )
@@ -404,7 +409,9 @@ class LangChainRuntime:
                 )
                 for tool in snapshot["tools"]
             ]
-            instructions = runtime_instructions(snapshot)
+            instructions = snapshot.get("runtime_instructions") or runtime_instructions(
+                snapshot
+            )
             agent = create_agent(
                 self.model(snapshot),
                 tools=tools,
@@ -429,7 +436,14 @@ class LangChainRuntime:
         except TimeoutError:
             reason = "timeout"
         except asyncio.CancelledError:
-            status, reason = "interrupted", "worker_interrupted"
+            reason = run.get("_worker_stop", "worker_interrupted")
+            status = (
+                "cancelled"
+                if reason == "cancelled"
+                else "failed"
+                if reason == "access_revoked"
+                else "interrupted"
+            )
         except AgentError:
             reason = "access_revoked"
         except Exception:

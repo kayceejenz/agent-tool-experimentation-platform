@@ -25,7 +25,7 @@ const backend = createServer((request, response) => {
 	if (path === '/api/v1/projects') return send({ items: [project], next_cursor: null });
 	if (path.endsWith(`/projects/${projectId}`)) return send(project);
 	if (path.endsWith('/agents')) return send({ items: [agent], next_offset: null });
- if (path.endsWith(`/agents/${agentId}`) || path.includes(`/agents/${agentId}/revisions/`)) return send({ ...agent, revision: Number(path.split('/').at(-1)) || 1, current_revision: 1, system_prompt: null, agent_prompt: null, tools: [], limits: { max_turns: 16, max_tool_calls: 20, timeout_seconds: 60, max_output_tokens: 2048 }, configuration_issues: [], configuration_ready: true });
+ if (path.endsWith(`/agents/${agentId}`) || path.includes(`/agents/${agentId}/revisions/`)) return send({ ...agent, revision: Number(path.split('/').at(-1)) || 1, current_revision: 1, system_prompt: null, agent_prompt: null, evaluation_prompt: null, evaluation_profile: { enabled: true, prompt: null, model: null }, tools: [], limits: { max_turns: 16, max_tool_calls: 20, timeout_seconds: 60, max_output_tokens: 2048 }, configuration_issues: [], configuration_ready: true });
  if (path.endsWith(`/agents/${agentId}/revisions`)) return send({ items: [{ ...agent, revision: url.searchParams.has('offset') ? 2 : 1 }], next_offset: url.searchParams.has('offset') ? null : 1 });
 
 	if (path.endsWith('/tools')) {
@@ -35,6 +35,7 @@ const backend = createServer((request, response) => {
 	if (path.endsWith('/prompts')) return send({ items: [], next_offset: 20 });
 	if (path.endsWith('/spans')) return send({ items: [span], next_offset: null });
 	if (path.endsWith(`/spans/${spanId}`)) return send({ ...span, inputs: { task: 'A large input' }, outputs: { text: 'Payload loaded on demand' } });
+	if (path.endsWith('/evaluations')) return send({ items: [], next_offset: null });
 	if (path.endsWith('/snapshot')) return send({ snapshot: { model_settings: agent.model_settings } });
 	if (path.includes('/executions/requests/')) {
 		savedRequest = path.split('/').at(-1)!;
@@ -132,7 +133,7 @@ test('trace payloads and snapshot are fetched only when opened', async ({ page }
 	runStatus = 'completed'; await start(page);
 	const base = `/api/v1/projects/${projectId}/executions/${runId}`;
 	expect(counts[`${base}/spans`]).toBeUndefined();
-	await page.locator('.playground-details > summary').click();
+	await page.locator('.playground-details:not(.evaluation-panel) > summary').click();
 	await expect(page.locator('.execution-span')).toHaveCount(1);
 	expect(counts[`${base}/spans/${spanId}`]).toBeUndefined();
 	expect(counts[`${base}/snapshot`]).toBeUndefined();
@@ -210,4 +211,100 @@ test('editing an agent protects a dirty draft and keeps it when discard is decli
  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
  await dialog.getByRole('button', { name: 'Discard changes' }).click();
  await expect(dialog).toHaveCount(0);
+});
+
+test('evaluation report separates outcome, findings and usage on desktop and mobile', async ({ page }) => {
+    runStatus = 'completed';
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    const evaluation = {
+        id: '77777777-7777-4777-8777-777777777777', attempt: 1, status: 'completed', error_code: null,
+        profile: { model: 'fixture-judge', rubric_version: 1, prompt: null },
+        metrics: { tool_calls: 1, model_turns: 2, elapsed_ms: 1450,
+            usage_counts: { input_count: 1234, output_count: 56, missing_usage_turns: 0 }, assertions: [] },
+        usage: { input_count: 900, output_count: 150 },
+        report: { task_outcome: 'partial', overall_verdict: 'partial', critical_failures: [], limitations: ['The final price could not be verified.'],
+            requirements: [{ name: 'Report product price', status: 'partial', reason: 'The answer omitted the currency.', evidence_refs: ['final_answer'] }],
+            checks: ['task_completion', 'tool_selection', 'tool_inputs', 'output_use', 'answer_quality', 'efficiency', 'write_handling'].map(name => ({
+                name, status: name === 'answer_quality' ? 'partial' : 'pass', reason: name === 'answer_quality' ? 'The currency is missing from the answer.' : 'Supported by the recorded result.', evidence_refs: [spanId],
+            })) },
+    };
+    await page.route(`**/api/projects/${projectId}/executions/${runId}/evaluations`, route => route.fulfill({ json: { items: [evaluation], next_offset: null } }));
+    await start(page);
+    const panel = page.locator('.evaluation-panel');
+    await expect(panel).not.toHaveAttribute('open', '');
+    await expect(panel.locator('.evaluation-overview')).not.toBeVisible();
+    await expect(page.locator('.execution-answer')).toBeVisible();
+    await panel.locator(':scope > summary').click();
+    await expect(panel.locator('.evaluation-overview')).toContainText('Partial');
+    await expect(panel).toContainText('1 check needs attention');
+    const answerCheck = panel.locator('.evaluation-finding').filter({ hasText: 'Answer quality' }).first();
+    await answerCheck.locator('summary').first().click();
+    await expect(answerCheck).toContainText('The currency is missing');
+    const evidencePath = `/api/v1/projects/${projectId}/executions/${runId}/spans/${spanId}`;
+    expect(counts[evidencePath]).toBeUndefined();
+    await answerCheck.locator('.evaluation-evidence > summary').click();
+    await expect(answerCheck.locator('.trace-payloads')).toContainText('Payload loaded on demand');
+    await panel.locator('.evaluation-usage > summary').click();
+    await expect(panel.getByRole('table')).toContainText('1,234');
+    await expect(panel).toContainText('1.4s');
+    await panel.locator(':scope > summary').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: '/tmp/agent-evaluation-desktop.png' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(panel.getByRole('button', { name: 'Evaluate again' })).toBeVisible();
+    expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await panel.locator(':scope > summary').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: '/tmp/agent-evaluation-mobile.png' });
+    await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
+    await page.screenshot({ path: '/tmp/agent-evaluation-dark.png' });
+    expect(errors).toEqual([]);
+});
+
+test('evaluation settings have their own wizard step and clear automatic controls', async ({ page }) => {
+    await page.goto(`/projects/${projectId}/agents`);
+    await page.getByRole('button', { name: 'Create agent', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: /Evaluation$/ }).click();
+    await expect(dialog.getByRole('heading', { name: 'Evaluate every finished request' })).toBeVisible();
+    await expect(dialog.getByRole('checkbox', { name: /Automatic evaluation/ })).toBeChecked();
+    await expect(dialog.getByLabel('Evaluator model', { exact: false })).toBeVisible();
+    await dialog.getByRole('checkbox', { name: /Automatic evaluation/ }).uncheck();
+    await expect(dialog.locator('.evaluation-toggle-state')).toHaveText('Off');
+    await expect(dialog).toContainText('Use of results');
+    await page.screenshot({ path: '/tmp/agent-evaluation-settings.png' });
+});
+
+test('evaluation empty, queued, failed and history states stay actionable', async ({ page }) => {
+    runStatus = 'completed';
+    const profile = { model: 'fixture-judge', rubric_version: 1, prompt: null };
+    type Item = { id: string; attempt: number; status: string; profile: typeof profile; error_code: string | null; metrics: null; usage: null;
+        report: null | { task_outcome: string; overall_verdict: string; requirements: unknown[]; checks: unknown[]; critical_failures: unknown[]; limitations: string[] } };
+    let items: Item[] = [];
+    await page.route(`**/api/projects/${projectId}/executions/${runId}/evaluations`, route => {
+        if (route.request().method() === 'POST') {
+            expect(route.request().postDataJSON().request_id).toMatch(/^[a-f0-9-]{36}$/);
+            const item: Item = { id: `evaluation-${items.length + 1}`, attempt: items.length + 1, status: 'queued', profile, report: null, error_code: null, metrics: null, usage: null };
+            items = [item, ...items];
+            return route.fulfill({ status: 202, json: { id: item.id, status: item.status } });
+        }
+        return route.fulfill({ json: { items, next_offset: null } });
+    });
+    await start(page);
+    const panel = page.locator('.evaluation-panel');
+    await panel.locator(':scope > summary').click();
+    await expect(panel.getByRole('heading', { name: 'No evaluation yet' })).toBeVisible();
+    await panel.getByRole('button', { name: 'Evaluate request' }).click();
+    await expect(panel.getByRole('heading', { name: 'Waiting for evaluation' })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Evaluate again' })).toBeDisabled();
+    items[0].status = 'failed'; items[0].error_code = 'provider_quota';
+    await expect(panel.getByRole('alert')).toContainText('Check the provider account');
+    await expect(panel.getByRole('button', { name: 'Evaluate again' })).toBeEnabled();
+    await panel.getByRole('button', { name: 'Evaluate again' }).click();
+    await expect(panel.getByRole('heading', { name: 'Waiting for evaluation' })).toBeVisible();
+    items[0].status = 'completed';
+    items[0].report = { task_outcome: 'completed', overall_verdict: 'pass', requirements: [], checks: [], critical_failures: [], limitations: [] };
+    await expect(panel.locator('.evaluation-overview')).toContainText('Completed');
+    await panel.getByLabel('Evaluation history').selectOption('evaluation-1');
+    await expect(panel.getByRole('alert')).toContainText('Check the provider account');
+    await expect(page.locator('.execution-answer')).toContainText('Completed answer');
 });

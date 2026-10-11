@@ -3,6 +3,7 @@ import { type AgentSummary } from '@/types/agent';
 import { AgentHistory } from './agent-history';
 import { useAgentEditor, tabs, wizardSteps } from '@/components/agents/use-agent-editor';
 import { AgentDetailsFields } from './agent-details-fields';
+import { AgentEvaluationFields } from './agent-evaluation-fields';
 import { AgentPromptsFields } from './agent-prompts-fields';
 import { AgentModelFields } from './agent-model-fields';
 import { AgentToolsFields } from './agent-tools-fields';
@@ -30,6 +31,8 @@ export function AgentEditor({
 		setSystem,
 		agentPrompt,
 		setAgentPrompt,
+		evaluationPrompt,
+		setEvaluationPrompt,
 		tools,
 		setTools,
 		tab,
@@ -197,6 +200,9 @@ export function AgentEditor({
 						{(managing
 							? tab === 'Limits'
 							: step === 4) && <AgentLimitsFields form={form} disabled={disabled} field={field} />}
+                        {(managing ? tab === 'Evaluation' : step === 5) && <AgentEvaluationFields
+                            form={form} field={field} evaluationPrompt={evaluationPrompt} setEvaluationPrompt={setEvaluationPrompt}
+                            setPickerBusy={setPickerBusy} disabled={disabled} projectId={projectId} />}
 						{canEdit && (
 							<footer className='agent-save'>
 								<p className='mcp-note'>

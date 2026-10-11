@@ -44,3 +44,14 @@ test('Retry-After and permanent failures have distinct polling behavior', async 
 	expect(retryDelay('Thu, 08 Oct 2026 12:00:00 GMT', Date.parse('2026-10-08T11:59:50Z'))).toBe(10000);
 	await expect(readJsonResponse(Response.json({ ok: true }))).resolves.toEqual({ ok: true });
 });
+
+
+test('evaluation envelopes reject malformed reports before rendering', () => {
+    const path = '/project/executions/run/evaluations';
+    expect(() => assertProjectPayload(path, { items: [], next_offset: null })).not.toThrow();
+    expect(() => assertProjectPayload(path, { ok: true })).toThrow();
+    const item = { id: 'evaluation', attempt: 1, status: 'completed', profile: { model: 'judge', rubric_version: 1 }, metrics: null,
+        report: { task_outcome: 'unknown', overall_verdict: 'unknown', checks: [], requirements: [], critical_failures: [], limitations: [] } };
+    expect(() => assertProjectPayload(path, { items: [item], next_offset: null })).not.toThrow();
+    expect(() => assertProjectPayload(path, { items: [{ ...item, report: { ...item.report, checks: [{}] } }], next_offset: null })).toThrow();
+});

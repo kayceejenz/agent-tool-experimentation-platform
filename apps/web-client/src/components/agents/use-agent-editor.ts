@@ -12,10 +12,11 @@ export const tabs = [
 	'Model',
 	'Tools',
 	'Limits',
+	'Evaluation',
 	'History',
 ] as const;
 
-export const wizardSteps = ['Details', 'Prompts', 'Model', 'Tools', 'Limits'] as const;
+export const wizardSteps = ['Details', 'Prompts', 'Model', 'Tools', 'Limits', 'Evaluation'] as const;
 
 type Tab = (typeof tabs)[number];
 
@@ -39,6 +40,7 @@ export function useAgentEditor({
 		[agentPrompt, setAgentPrompt] = useState<PromptBinding | null>(
 			null,
 		),
+		[evaluationPrompt, setEvaluationPrompt] = useState<PromptBinding | null>(null),
 		[tools, setTools] = useState<ToolBinding[]>([]),
 		[tab, setTab] = useState<Tab>('Details'),
 		[step, setStep] = useState<number>(0);
@@ -56,6 +58,7 @@ export function useAgentEditor({
 		...form,
 		system_prompt: reference(system),
 		agent_prompt: reference(agentPrompt),
+		evaluation_profile: { ...form.evaluation_profile, prompt: reference(evaluationPrompt) },
 		tools: tools
 			.map(t => ({ id: t.id, revision: t.revision }))
 			.sort((a, b) => a.id.localeCompare(b.id)),
@@ -71,6 +74,7 @@ export function useAgentEditor({
 		setForm(configOf(value));
 		setSystem(value.system_prompt);
 		setAgentPrompt(value.agent_prompt);
+		setEvaluationPrompt(value.evaluation_prompt);
 		setTools(value.tools);
 	}
 
@@ -179,6 +183,8 @@ export function useAgentEditor({
 		setSystem,
 		agentPrompt,
 		setAgentPrompt,
+		evaluationPrompt,
+		setEvaluationPrompt,
 		tools,
 		setTools,
 		tab,

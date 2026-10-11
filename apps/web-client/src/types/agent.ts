@@ -16,11 +16,18 @@ export type ToolBinding = Reference & {
 	server_enabled: boolean;
 };
 
+export type EvaluationProfile = {
+    enabled: boolean;
+    prompt: Reference | null;
+    model: string | null;
+};
+
 export type AgentConfig = {
 	name: string;
 	description: string;
 	system_prompt: Reference | null;
 	agent_prompt: Reference | null;
+	evaluation_profile: EvaluationProfile;
 	model_settings: {
 		provider: string;
 		model: string;
@@ -50,6 +57,8 @@ export type Agent = Omit<AgentSummary, 'tool_count'> & {
 	current_revision: number;
 	system_prompt: PromptBinding | null;
 	agent_prompt: PromptBinding | null;
+	evaluation_profile: EvaluationProfile;
+	evaluation_prompt: PromptBinding | null;
 	tools: ToolBinding[];
 	limits: AgentConfig['limits'];
 	configuration_issues: string[];
@@ -67,6 +76,7 @@ export function configOf(agent: Agent): AgentConfig {
 		description: agent.description,
 		system_prompt: reference(agent.system_prompt),
 		agent_prompt: reference(agent.agent_prompt),
+		evaluation_profile: agent.evaluation_profile,
 		model_settings: agent.model_settings,
 		limits: agent.limits,
 		tools: agent.tools
@@ -80,6 +90,7 @@ export const newAgent: AgentConfig = {
 	description: '',
 	system_prompt: null,
 	agent_prompt: null,
+	evaluation_profile: { enabled: true, prompt: null, model: null },
 	model_settings: { provider: '', model: '', temperature: null },
 	tools: [],
 	limits: {

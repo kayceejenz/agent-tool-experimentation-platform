@@ -93,3 +93,94 @@
 	padding-left: 20px;
 	color: var(--muted);
 }
+
+.evaluation-finding { padding: .65rem 0; border-bottom: 1px solid var(--line); }
+.evaluation-finding summary, .evaluation-evidence summary { cursor: pointer; }
+.evaluation-finding p { margin: .6rem 0; }
+.evaluation-evidence { margin: .6rem 0; }
+
+/* Evaluation reports share the workspace theme and stay readable in the playground. */
+.evaluation-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.evaluation-toolbar > p, .evaluation-muted { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0; }
+.evaluation-run-button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.evaluation-panel .evaluation-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 6px; background: var(--subtle); color: var(--muted); white-space: nowrap; }
+.evaluation-panel .verdict-pass, .evaluation-panel .verdict-completed { color: var(--success); background: color-mix(in srgb, var(--success) 9%, var(--panel)); }
+.evaluation-panel .verdict-fail, .evaluation-panel .verdict-failed { color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, var(--panel)); }
+.evaluation-panel .verdict-partial, .evaluation-panel .verdict-blocked { color: var(--warning); background: color-mix(in srgb, var(--warning) 9%, var(--panel)); }
+.evaluation-overview { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+.evaluation-overview > div { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px; background: var(--panel-strong); border: 1px solid var(--line); border-radius: 10px; }
+.evaluation-eyebrow { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+.evaluation-overview strong { font-size: 20px; font-weight: 500; }
+.evaluation-overview small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.evaluation-overview .evaluation-badge { font-size: 14px; }
+.evaluation-group { margin: 22px 0; }
+.evaluation-group > h4, .evaluation-critical > h4, .evaluation-limitations > h4, .evaluation-assertions > h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; font-weight: 500; }
+.evaluation-group > h4 > span { color: var(--muted); font-size: 11px; font-weight: 400; }
+.evaluation-finding { padding: 0; }
+.evaluation-finding > summary { display: flex; align-items: center; gap: 10px; padding: 12px 0; list-style: none; }
+.evaluation-finding > summary::before { content: '›'; color: var(--muted); font-size: 17px; }
+.evaluation-finding[open] > summary::before { transform: rotate(90deg); }
+.evaluation-finding > summary > strong { font-size: 13px; font-weight: 400; overflow-wrap: anywhere; }
+.evaluation-finding > summary > .evaluation-badge { margin-left: auto; }
+.evaluation-finding-content { padding: 0 0 14px 18px; font-size: 13px; line-height: 1.7; }
+.evaluation-finding-content > p { margin-top: 0; }
+.evaluation-evidence { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-strong); overflow-wrap: anywhere; }
+.evaluation-evidence summary { font-size: 12px; color: var(--accent); }
+.evaluation-evidence .trace-payloads { min-width: 0; }
+.evaluation-evidence pre { overflow: auto; max-height: 260px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
+.evaluation-critical { padding: 14px; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line)); border-radius: 10px; }
+.evaluation-critical > h4 { color: var(--danger); }
+.evaluation-limitations, .evaluation-notice { padding: 14px; border-radius: 8px; background: var(--panel-strong); border: 1px solid var(--line); font-size: 12px; line-height: 1.7; margin: 16px 0; }
+.evaluation-limitations ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.evaluation-notice { display: flex; align-items: flex-start; gap: 10px; }
+.evaluation-notice p { margin: 0; }
+.evaluation-empty { padding: 24px 16px; border: 1px dashed var(--line); border-radius: 10px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.evaluation-empty h4 { color: var(--foreground); margin: 10px 0 6px; font-size: 14px; font-weight: 500; }
+.evaluation-empty p { margin: 0 auto; max-width: 380px; }
+.evaluation-usage { margin: 20px 0; border-top: 1px solid var(--line); padding-top: 14px; }
+.evaluation-usage > summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.evaluation-metrics { display: grid; grid-template-columns: repeat(3, 1fr); margin: 16px 0; gap: 10px; }
+.evaluation-metrics > div { display: flex; flex-direction: column; gap: 6px; background: var(--panel-strong); border-radius: 8px; padding: 12px; }
+.evaluation-metrics span { color: var(--muted); font-size: 11px; }
+.evaluation-metrics strong { font-size: 18px; font-weight: 500; }
+.evaluation-token-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+.evaluation-token-table caption { text-align: left; margin-bottom: 10px; font-weight: 500; }
+.evaluation-token-table th, .evaluation-token-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+.evaluation-token-table th:first-child { text-align: left; }
+.evaluation-token-table thead th { color: var(--muted); font-weight: 400; }
+.evaluation-token-table tbody th { font-weight: 400; }
+.evaluation-assertions { margin-top: 20px; }
+.evaluation-assertions > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; font-size: 12px; border-bottom: 1px solid var(--line); }
+.evaluation-assertions small { display: block; margin-top: 5px; color: var(--muted); overflow-wrap: anywhere; }
+.evaluation-provenance { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 11px; margin-top: 22px; }
+.evaluation-provenance > span { overflow-wrap: anywhere; }
+.evaluation-provenance select { max-width: 200px; border: 1px solid var(--line); border-radius: 6px; padding: 6px; background: var(--panel); color: var(--foreground); font: inherit; }
+.evaluation-intro { display: flex; gap: 12px; margin: 10px 0 24px; align-items: flex-start; }
+.evaluation-intro > svg { color: var(--accent); flex-shrink: 0; }
+.evaluation-intro h3 { font-size: 17px; font-weight: 500; margin: 0 0 8px; }
+.evaluation-intro p { color: var(--muted); font-size: 13px; line-height: 1.7; margin: 0; }
+.evaluation-toggle { display: flex; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 18px; cursor: pointer; }
+.evaluation-toggle input { width: 16px; height: 16px; accent-color: var(--accent); flex-shrink: 0; }
+.evaluation-toggle strong { display: block; font-size: 14px; font-weight: 500; }
+.evaluation-toggle small { display: block; margin-top: 5px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+.evaluation-toggle-state { margin-left: auto; font-size: 12px; color: var(--muted); }
+.evaluation-rubric-preview { margin: 24px 0; }
+.evaluation-rubric-preview h4 { font-size: 13px; font-weight: 500; margin: 0 0 12px; }
+.evaluation-dimensions { display: flex; flex-wrap: wrap; gap: 7px; }
+.evaluation-dimensions > span { padding: 6px 10px; background: var(--subtle); border-radius: 6px; font-size: 12px; }
+.evaluation-rubric-preview p, .agent-evaluation-settings .tool-field small { font-size: 12px; color: var(--muted); line-height: 1.7; }
+.evaluation-custom-rubric { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 18px; }
+.evaluation-custom-rubric > summary { cursor: pointer; font-size: 13px; }
+.evaluation-custom-rubric > summary > span { color: var(--muted); font-size: 11px; margin-left: 8px; }
+@media (max-width: 540px) {
+    .evaluation-toolbar { align-items: flex-start; flex-direction: column; }
+    .evaluation-overview { gap: 8px; }
+    .evaluation-overview > div { padding: 12px; }
+    .evaluation-overview strong { font-size: 17px; }
+    .evaluation-provenance { align-items: flex-start; flex-direction: column; }
+    .evaluation-finding-content { padding-left: 0; }
+    .evaluation-metrics > div { padding: 9px; }
+}
+.evaluation-history-label { display: block; font-size: 10px; margin-bottom: 4px; }
+.evaluation-source { display: inline-block; margin: 4px 12px 4px 0; font-size: 12px; color: var(--accent); }
+.evaluation-finding summary:focus-visible, .evaluation-evidence summary:focus-visible, .evaluation-usage summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }

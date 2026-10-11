@@ -22,7 +22,15 @@ class ExecutionRepository:
         return redact(json_value(value), self.secret)
 
     async def start(self, user_id, project_id, agent_id, body):
-        digest = hashlib.sha256(body.input.encode()).hexdigest()
+        expectations = (
+            body.expectations.model_dump(mode="json") if body.expectations else None
+        )
+        digest_input = (
+            body.input
+            if expectations is None
+            else json.dumps([body.input, expectations], sort_keys=True)
+        )
+        digest = hashlib.sha256(digest_input.encode()).hexdigest()
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
                 await AgentRepository.member(db, user_id, project_id, True)
@@ -74,7 +82,17 @@ class ExecutionRepository:
                     tool["definition"] = definition["definition"]
                     tool["alias"] = "tool_" + tool["id"].hex
                 # Preserve settings keys (e.g. max_output_tokens); redact user text and definitions.
+                from integrations.agents.langchain_runtime import runtime_instructions
+
+                from modules.evaluations.services.evaluation_service import profile_snapshot
+
                 snapshot = json_value(detail)
+                snapshot["evaluation_profile"] = profile_snapshot(detail)
+                snapshot.pop("evaluation_prompt", None)
+                snapshot["runtime_instructions"] = self.safe(
+                    runtime_instructions(snapshot)
+                )
+                snapshot["expectations"] = self.safe(expectations)
                 for key in (
                     "system_prompt",
                     "agent_prompt",
@@ -82,6 +100,9 @@ class ExecutionRepository:
                     "description",
                 ):
                     snapshot[key] = self.safe(snapshot[key])
+                snapshot["evaluation_profile"]["instructions"] = self.safe(
+                    snapshot["evaluation_profile"]["instructions"]
+                )
                 # Schema properties are definitions, including names like "token".
                 # Preserve keys so redaction cannot change argument semantics.
                 if self.secret:
@@ -111,22 +132,36 @@ class ExecutionRepository:
                 await AgentRepository.member(db, user_id, project_id)
                 row = await (
                     await db.execute(
-                        ("SELECT *" if view == "full" else "SELECT id,agent_revision,status,termination_reason,final_answer,created_at,finished_at" + (",input" if view == "summary" else "")) + " FROM agent_platform.agent_executions WHERE project_id=%s AND id=%s",
+                        (
+                            "SELECT *"
+                            if view == "full"
+                            else "SELECT id,agent_revision,status,termination_reason,final_answer,created_at,finished_at"
+                            + (",input" if view == "summary" else "")
+                        )
+                        + " FROM agent_platform.agent_executions WHERE project_id=%s AND id=%s",
                         (project_id, execution_id),
                     )
                 ).fetchone()
                 if not row:
                     raise AgentError(404, "Execution not found")
                 if view != "full":
-                    counts = await (await db.execute(
-                        "SELECT count(*) FILTER(WHERE kind='model') AS model_turns,count(*) FILTER(WHERE kind='tool') AS tool_calls FROM agent_platform.execution_spans WHERE execution_id=%s",
-                        (execution_id,),
-                    )).fetchone()
-                    hint = await (await db.execute(
-                        "SELECT outputs->>'hint' AS hint FROM agent_platform.execution_spans WHERE execution_id=%s AND error_code IS NOT NULL ORDER BY sequence LIMIT 1",
-                        (execution_id,),
-                    )).fetchone()
-                    return {**row, **counts, "failure_hint": hint["hint"] if hint else None}
+                    counts = await (
+                        await db.execute(
+                            "SELECT count(*) FILTER(WHERE kind='model') AS model_turns,count(*) FILTER(WHERE kind='tool') AS tool_calls FROM agent_platform.execution_spans WHERE execution_id=%s",
+                            (execution_id,),
+                        )
+                    ).fetchone()
+                    hint = await (
+                        await db.execute(
+                            "SELECT outputs->>'hint' AS hint FROM agent_platform.execution_spans WHERE execution_id=%s AND error_code IS NOT NULL ORDER BY sequence LIMIT 1",
+                            (execution_id,),
+                        )
+                    ).fetchone()
+                    return {
+                        **row,
+                        **counts,
+                        "failure_hint": hint["hint"] if hint else None,
+                    }
                 row.pop("input_hash", None)
                 row["spans"] = await (
                     await db.execute(
@@ -263,6 +298,18 @@ class ExecutionRepository:
                 ),
             )
 
+    async def record_observation(self, span_id, content):
+        async with self.database.connection() as conn:
+            await conn.execute(
+                "UPDATE agent_platform.execution_spans SET model_visible_output=%s WHERE id=%s",
+                (
+                    content.replace(self.secret, "[redacted]")
+                    if self.secret
+                    else content,
+                    span_id,
+                ),
+            )
+
     async def finish(self, run_id, status, reason, answer=None):
         async with self.database.connection() as conn:
             await conn.execute(
@@ -274,28 +321,41 @@ class ExecutionRepository:
                 (status, reason, self.safe(answer), run_id),
             )
 
-    async def trace(self, user_id, project_id, execution_id, offset=0, span_id=None, snapshot=False):
+    async def trace(
+        self, user_id, project_id, execution_id, offset=0, span_id=None, snapshot=False
+    ):
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
                 await AgentRepository.member(db, user_id, project_id)
-                execution = await (await db.execute(
-                    "SELECT id" + (",snapshot" if snapshot else "") + " FROM agent_platform.agent_executions WHERE project_id=%s AND id=%s",
-                    (project_id, execution_id),
-                )).fetchone()
+                execution = await (
+                    await db.execute(
+                        "SELECT id"
+                        + (",snapshot" if snapshot else "")
+                        + " FROM agent_platform.agent_executions WHERE project_id=%s AND id=%s",
+                        (project_id, execution_id),
+                    )
+                ).fetchone()
                 if not execution:
                     raise AgentError(404, "Execution not found")
                 if snapshot:
                     return {"snapshot": execution["snapshot"]}
                 if span_id is not None:
-                    row = await (await db.execute(
-                        "SELECT * FROM agent_platform.execution_spans WHERE execution_id=%s AND id=%s",
-                        (execution_id, span_id),
-                    )).fetchone()
+                    row = await (
+                        await db.execute(
+                            "SELECT * FROM agent_platform.execution_spans WHERE execution_id=%s AND id=%s",
+                            (execution_id, span_id),
+                        )
+                    ).fetchone()
                     if not row:
                         raise AgentError(404, "Execution step not found")
                     return row
-                rows = await (await db.execute(
-                    "SELECT id,sequence,parent_id,kind,name,status,call_id,tool_id,tool_revision,tool_execution_id,context_span_ids,error_code,duration_ms FROM agent_platform.execution_spans WHERE execution_id=%s ORDER BY sequence LIMIT 51 OFFSET %s",
-                    (execution_id, offset),
-                )).fetchall()
-                return {"items": rows[:50], "next_offset": offset + 50 if len(rows) > 50 else None}
+                rows = await (
+                    await db.execute(
+                        "SELECT id,sequence,parent_id,kind,name,status,call_id,tool_id,tool_revision,tool_execution_id,context_span_ids,error_code,duration_ms FROM agent_platform.execution_spans WHERE execution_id=%s ORDER BY sequence LIMIT 51 OFFSET %s",
+                        (execution_id, offset),
+                    )
+                ).fetchall()
+                return {
+                    "items": rows[:50],
+                    "next_offset": offset + 50 if len(rows) > 50 else None,
+                }
