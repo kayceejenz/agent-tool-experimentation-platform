@@ -2,23 +2,21 @@ import hashlib
 import json
 from uuid import uuid4
 
+from core.serialization import json_value
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from modules.agents.models.error_model import AgentError
 from modules.agents.repos.agent_repo import AgentRepository
+from modules.executions.helpers.snapshot import execution_snapshot
 from modules.tools.helpers.validation import redact, redact_text
-
-
-def json_value(value):
-    return json.loads(json.dumps(value, default=str, allow_nan=False))
 
 
 class ExecutionRepository:
     def __init__(self, database, secret=None):
         self.database, self.secret = database, secret
 
-    def safe(self, value):
+    def redact_for_storage(self, value):
         return redact(json_value(value), self.secret)
 
     async def start(self, user_id, project_id, agent_id, body):
@@ -60,7 +58,10 @@ class ExecutionRepository:
                     raise AgentError(
                         409, "Enable a ready, current agent revision before running"
                     )
-                if detail["model_settings"]["provider"].lower() not in ("openai", "google"):
+                if detail["model_settings"]["provider"].lower() not in (
+                    "openai",
+                    "google",
+                ):
                     raise AgentError(
                         422, "The runtime supports OpenAI and Google providers"
                     )
@@ -81,34 +82,7 @@ class ExecutionRepository:
                     ).fetchone()
                     tool["definition"] = definition["definition"]
                     tool["alias"] = "tool_" + tool["id"].hex
-                # Preserve settings keys (e.g. max_output_tokens); redact user text and definitions.
-                from integrations.agents.langchain_runtime import runtime_instructions
-
-                from modules.evaluations.services.evaluation_service import profile_snapshot
-
-                snapshot = json_value(detail)
-                snapshot["evaluation_profile"] = profile_snapshot(detail)
-                snapshot.pop("evaluation_prompt", None)
-                snapshot["runtime_instructions"] = self.safe(
-                    runtime_instructions(snapshot)
-                )
-                snapshot["expectations"] = self.safe(expectations)
-                for key in (
-                    "system_prompt",
-                    "agent_prompt",
-                    "name",
-                    "description",
-                ):
-                    snapshot[key] = self.safe(snapshot[key])
-                snapshot["evaluation_profile"]["instructions"] = self.safe(
-                    snapshot["evaluation_profile"]["instructions"]
-                )
-                # Schema properties are definitions, including names like "token".
-                # Preserve keys so redaction cannot change argument semantics.
-                if self.secret:
-                    snapshot["tools"] = json.loads(
-                        redact_text(json.dumps(snapshot["tools"]), self.secret)
-                    )
+                snapshot = execution_snapshot(detail, expectations, self.secret)
                 return await (
                     await db.execute(
                         "INSERT INTO agent_platform.agent_executions(id,project_id,agent_id,agent_revision,user_id,request_id,input,input_hash,snapshot) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *",
@@ -119,7 +93,7 @@ class ExecutionRepository:
                             body.revision,
                             user_id,
                             body.request_id,
-                            self.safe(body.input),
+                            self.redact_for_storage(body.input),
                             digest,
                             Jsonb(snapshot),
                         ),
@@ -278,7 +252,7 @@ class ExecutionRepository:
                         fields.get("tool_revision"),
                         fields.get("executor_request_id"),
                         Jsonb(json_value(fields.get("context_span_ids", []))),
-                        Jsonb(self.safe(fields["inputs"])),
+                        Jsonb(self.redact_for_storage(fields["inputs"])),
                     ),
                 )
                 return identifier
@@ -291,7 +265,7 @@ class ExecutionRepository:
                 "UPDATE agent_platform.execution_spans s SET status=%s,outputs=%s,error_code=%s,tool_execution_id=COALESCE(%s,(SELECT t.id FROM agent_platform.tool_executions t WHERE t.tool_id=s.tool_id AND t.request_id=s.executor_request_id)),finished_at=now(),duration_ms=greatest(0,(extract(epoch FROM now()-created_at)*1000)::integer) WHERE s.id=%s",
                 (
                     status,
-                    Jsonb(self.safe(outputs)),
+                    Jsonb(self.redact_for_storage(outputs)),
                     error_code,
                     tool_execution_id,
                     span_id,
@@ -316,7 +290,7 @@ class ExecutionRepository:
             )
             await conn.execute(
                 "UPDATE agent_platform.agent_executions SET status=%s,termination_reason=%s,final_answer=%s,finished_at=now() WHERE id=%s AND status='running'",
-                (status, reason, self.safe(answer), run_id),
+                (status, reason, self.redact_for_storage(answer), run_id),
             )
 
     async def trace(

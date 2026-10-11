@@ -1,47 +1,32 @@
-from integrations.agents.model_provider import configured_secrets
-from modules.evaluations.controllers.evaluation_controller import router as evaluations_router
-from modules.evaluations.repos.evaluation_repo import EvaluationRepository
-from modules.agents.controllers.agent_controller import router as agents_router
-from modules.agents.models.error_model import AgentError
-from modules.agents.repos.agent_repo import AgentRepository
-from modules.executions.controllers.execution_controller import router as executions_router
-from modules.executions.repos.execution_repo import ExecutionRepository
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Literal
 
 import uvicorn
-from anyio import to_thread
 from core.settings import Settings
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from integrations.database import Database
-from integrations.mcp.credential_cipher import CredentialCipher
+from modules.agents.controllers.agent_controller import router as agents_router
+from modules.agents.models.error_model import AgentError
 from modules.auth.controllers.auth_controller import router as auth_router
-from modules.auth.helpers.passwords import Argon2idPasswordHasher
-from modules.auth.helpers.tokens import JwtAccessTokenIssuer
-from modules.auth.repos.rate_limit_repo import AuthRateLimitRepository
-from modules.auth.repos.refresh_token_repo import RefreshTokenRepository
-from modules.auth.repos.user_repo import UserRepository
-from modules.auth.services.auth_service import AuthenticationService
-from modules.auth.services.rate_limit_service import AuthRateLimiter
+from modules.evaluations.controllers.evaluation_controller import (
+    router as evaluations_router,
+)
+from modules.executions.controllers.execution_controller import (
+    router as executions_router,
+)
 from modules.mcp_servers.controllers.server_controller import router as mcp_router
 from modules.mcp_servers.models.error_model import McpConnectionError
-from modules.mcp_servers.repos.server_repo import ServerRepository
-from modules.mcp_servers.services.server_service import ServerService
 from modules.projects.controllers.project_controller import router as project_router
-from modules.projects.repos.project_repo import ProjectRepository
-from modules.projects.services.project_service import ProjectService
 from modules.prompts.controllers.prompt_controller import router as prompts_router
 from modules.prompts.models.error_model import PromptError
-from modules.prompts.repos.prompt_repo import PromptRepository
 from modules.tools.controllers.tool_controller import router as tools_router
-from modules.tools.repos.tool_repo import ToolRepository
-from modules.tools.services.tool_service import ToolService
 from psycopg import Error as DatabaseError
 from psycopg_pool import PoolClosed, PoolTimeout, TooManyRequests
 from pydantic import BaseModel
+
+from api.bootstrap import configure_dependencies
 
 
 class HealthResponse(BaseModel):
@@ -57,61 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(instance: FastAPI) -> AsyncIterator[None]:
         config = settings if settings is not None else Settings()
-        instance.state.settings = config
-        database = Database(config)
-        instance.state.auth = None
-        instance.state.auth_rate_limiter = None
-        if config.jwt_secret is not None:
-            hasher = Argon2idPasswordHasher()
-            dummy_hash = await to_thread.run_sync(
-                hasher.hash, "agent-dummy-password-for-timing"
-            )
-            users = UserRepository(database)
-            secret = config.jwt_secret.get_secret_value()
-            instance.state.auth = AuthenticationService(
-                users,
-                hasher,
-                users,
-                JwtAccessTokenIssuer(
-                    secret,
-                    config.jwt_issuer,
-                    config.jwt_audience,
-                    config.access_token_minutes,
-                ),
-                RefreshTokenRepository(users),
-                users,
-                config.refresh_token_days,
-                (
-                    config.registration_invitation_code.get_secret_value()
-                    if config.registration_invitation_code is not None
-                    else None
-                ),
-                dummy_hash,
-            )
-            instance.state.auth_rate_limiter = AuthRateLimiter(
-                AuthRateLimitRepository(users),
-                secret,
-                config.registration_rate_limit,
-                config.registration_rate_window_seconds,
-                config.login_rate_limit,
-                config.login_rate_window_seconds,
-            )
-        instance.state.agents = AgentRepository(database)
-        instance.state.executions = ExecutionRepository(database, configured_secrets(config))
-        instance.state.evaluations = EvaluationRepository(database, configured_secrets(config))
-        instance.state.prompts = PromptRepository(database)
-        instance.state.database = database
-        instance.state.projects = ProjectService(ProjectRepository(database))
-        instance.state.mcp_servers = ServerService(
-            ServerRepository(database),
-            CredentialCipher(config.mcp_credential_key),
-            config,
-        )
-        instance.state.tools = ToolService(
-            ToolRepository(database),
-            CredentialCipher(config.mcp_credential_key),
-            config,
-        )
+        database = await configure_dependencies(instance, config)
         try:
             await database.open()
             yield

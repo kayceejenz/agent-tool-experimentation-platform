@@ -28,11 +28,13 @@ export function PromptPicker({
 		[error, setError] = useState('');
 	const base = `/${projectId}/prompts`;
 	const query = useDebouncedValue(search);
-	const catalog = usePagedCatalog<PromptSummary>(`${base}?type=${kind}&q=${encodeURIComponent(query)}`);
+	const catalog = usePagedCatalog<PromptSummary>(
+		`${base}?type=${kind}&q=${encodeURIComponent(query)}`,
+	);
 	const choices = catalog.items;
 	const identifier = value?.id;
 	useEffect(() => {
-		if(!identifier) return;
+		if (!identifier) return;
 		let active = true;
 		const controller = new AbortController();
 		void projectRequest<PromptPage>(
@@ -40,13 +42,14 @@ export function PromptPicker({
 			{ signal: controller.signal },
 		)
 			.then(page => {
-				if(active) {
+				if (active) {
 					setRevisions(page.items);
 					setOlder(page.next_offset);
 				}
 			})
 			.catch(e => {
-				if(active && !isCancelled(e)) setError(e.message);
+				if (active && !isCancelled(e))
+					setError(e.message);
 			});
 		return () => {
 			active = false;
@@ -54,7 +57,7 @@ export function PromptPicker({
 		};
 	}, [base, identifier]);
 	async function select(id: string, revision?: number) {
-		if(!id) {
+		if (!id) {
 			onChange(null);
 			return;
 		}
@@ -73,7 +76,7 @@ export function PromptPicker({
 					value?.latest_revision ??
 					prompt.revision,
 			});
-		} catch(e) {
+		} catch (e) {
 			setError(
 				e instanceof Error
 					? e.message
@@ -85,7 +88,7 @@ export function PromptPicker({
 		}
 	}
 	async function more() {
-		if(!value || older === null) return;
+		if (!value || older === null) return;
 		setBusy(true);
 		onBusyChange(true);
 		try {
@@ -94,7 +97,7 @@ export function PromptPicker({
 			);
 			setRevisions(old => [...old, ...page.items]);
 			setOlder(page.next_offset);
-		} catch(e) {
+		} catch (e) {
 			setError(
 				e instanceof Error
 					? e.message
@@ -105,7 +108,12 @@ export function PromptPicker({
 			onBusyChange(false);
 		}
 	}
-	const label = kind === 'system' ? 'System prompt' : kind === 'agent' ? 'Agent prompt' : 'Evaluation prompt';
+	const label =
+		kind === 'system'
+			? 'System prompt'
+			: kind === 'agent'
+				? 'Agent prompt'
+				: 'Evaluation prompt';
 	const options =
 		value && !choices.some(p => p.id === value.id)
 			? [value, ...choices]
@@ -117,16 +125,38 @@ export function PromptPicker({
 			: versions;
 	return (
 		<section className='agent-section'>
-			<label className='tool-field'>Search {label.toLowerCase()}s<input type='search' value={search} maxLength={160} onChange={e => setSearch(e.target.value)} /></label>
-			{catalog.loading && <p role='status'>Loading prompts…</p>}
+			<label className='tool-field'>
+				Search {label.toLowerCase()}s
+				<input
+					type='search'
+					value={search}
+					maxLength={160}
+					onChange={e =>
+						setSearch(e.target.value)
+					}
+				/>
+			</label>
+			{catalog.loading && (
+				<p role='status'>Loading prompts…</p>
+			)}
 			{catalog.error && <p role='alert'>{catalog.error}</p>}
-			{catalog.hasMore && <button type='button' className='button' disabled={catalog.loading} onClick={() => void catalog.more()}>Load more {label.toLowerCase()}s</button>}
+			{catalog.hasMore && (
+				<button
+					type='button'
+					className='button'
+					disabled={catalog.loading}
+					onClick={() => void catalog.more()}>
+					Load more {label.toLowerCase()}s
+				</button>
+			)}
 			<label className='tool-field'>
 				{label}
 				<select
 					value={value?.id ?? ''}
 					disabled={disabled || busy}
-					onChange={e => void select(e.target.value)}>
+					onChange={e =>
+						void select(e.target.value)
+					}>
 					<option value=''>Not selected</option>
 					{options.map(p => (
 						<option key={p.id} value={p.id}>
@@ -145,7 +175,9 @@ export function PromptPicker({
 					<label className='tool-field'>
 						{label} revision
 						<select
-							disabled={disabled || busy}
+							disabled={
+								disabled || busy
+							}
 							value={value.revision}
 							onChange={e =>
 								void select(
@@ -159,12 +191,18 @@ export function PromptPicker({
 							}>
 							{withSelected.map(r => (
 								<option
-									key={r.revision}
-									value={r.revision}>
+									key={
+										r.revision
+									}
+									value={
+										r.revision
+									}>
 									Revision{' '}
-									{r.revision}
+									{
+										r.revision
+									}
 									{r.revision ===
-										value.latest_revision
+									value.latest_revision
 										? ' (latest)'
 										: ''}
 								</option>
@@ -176,22 +214,24 @@ export function PromptPicker({
 							type='button'
 							className='button'
 							disabled={busy}
-							onClick={() => void more()}>
+							onClick={() =>
+								void more()
+							}>
 							Load older {kind}{' '}
 							revisions
 						</button>
 					)}
 					{value.latest_revision >
 						value.revision && (
-							<p className='mcp-note'>
-								Revision{' '}
-								{value.latest_revision}{' '}
-								is available. This agent
-								keeps revision{' '}
-								{value.revision} until
-								you select another.
-							</p>
-						)}
+						<p className='mcp-note'>
+							Revision{' '}
+							{value.latest_revision}{' '}
+							is available. This agent
+							keeps revision{' '}
+							{value.revision} until
+							you select another.
+						</p>
+					)}
 					<details className='agent-preview'>
 						<summary>
 							Preview{' '}

@@ -1,15 +1,26 @@
 'use client';
 import type { useAgentEditor } from '@/components/agents/use-agent-editor';
 
-type Props = Pick<ReturnType<typeof useAgentEditor>, 'current'
+type Props = Pick<
+	ReturnType<typeof useAgentEditor>,
+	| 'current'
 	| 'form'
 	| 'dirty'
 	| 'disabled'
 	| 'toggle'
 	| 'field'
-	| 'managing'>;
+	| 'managing'
+>;
 
-export function AgentDetailsFields({ current, form, dirty, disabled, toggle, field, managing }: Props) {
+export function AgentDetailsFields({
+	current,
+	form,
+	dirty,
+	disabled,
+	toggle,
+	field,
+	managing,
+}: Props) {
 	return (
 		<>
 			<label className='tool-field'>
@@ -21,12 +32,7 @@ export function AgentDetailsFields({ current, form, dirty, disabled, toggle, fie
 					disabled={disabled}
 					value={form.name}
 					onChange={e =>
-						field(
-							'name',
-							e
-								.target
-								.value,
-						)
+						field('name', e.target.value)
 					}
 				/>
 			</label>
@@ -40,9 +46,7 @@ export function AgentDetailsFields({ current, form, dirty, disabled, toggle, fie
 					onChange={e =>
 						field(
 							'description',
-							e
-								.target
-								.value,
+							e.target.value,
 						)
 					}
 				/>
@@ -50,25 +54,25 @@ export function AgentDetailsFields({ current, form, dirty, disabled, toggle, fie
 			{current && (
 				<section className='agent-section'>
 					<div className='mcp-sheet-section-heading'>
-						<h3>
-							Availability
-						</h3>
+						<h3>Availability</h3>
 						<button
 							type='button'
 							role='switch'
 							className='mcp-toggle'
 							aria-label='Enable agent'
-							aria-checked={current.enabled}
+							aria-checked={
+								current.enabled
+							}
 							disabled={
 								disabled ||
 								dirty ||
 								(!current.enabled &&
 									!current.configuration_ready)
 							}
-							onClick={() => void toggle()}>
-							<span
-								aria-hidden
-							/>
+							onClick={() =>
+								void toggle()
+							}>
+							<span aria-hidden />
 							<span>
 								{current.enabled
 									? 'Enabled'
@@ -78,58 +82,38 @@ export function AgentDetailsFields({ current, form, dirty, disabled, toggle, fie
 					</div>
 					{dirty && (
 						<p className='mcp-note'>
-							Save
-							your
-							changes
-							before
-							changing
-							availability.
+							Save your changes before
+							changing availability.
 						</p>
 					)}
-					<h4>
-						Saved
-						configuration
-					</h4>
-					{current
-						.configuration_issues
-						.length ? (
+					<h4>Saved configuration</h4>
+					{current.configuration_issues.length ? (
 						<ul className='agent-issues'>
 							{current.configuration_issues.map(
 								issue => (
 									<li
-										key={issue}>
-										{issue}
+										key={
+											issue
+										}>
+										{
+											issue
+										}
 									</li>
 								),
 							)}
 						</ul>
 					) : (
 						<p className='mcp-note'>
-							Configuration
-							complete.
-							Provider
-							compatibility
-							and
-							credentials
-							will
-							be
-							checked
-							when
-							model
-							integration
-							is
-							added.
+							Configuration complete.
+							Provider compatibility
+							and credentials will be
+							checked when model
+							integration is added.
 						</p>
 					)}
 					<p className='mcp-note'>
-						Model
-						execution
-						and
-						the
-						playground
-						are
-						not
-						available
+						Model execution and the
+						playground are not available
 						yet.
 					</p>
 				</section>

@@ -6,16 +6,23 @@ import { projectRequest } from '@/lib/projects/client';
 import type { Project } from '@/types/workspace';
 import type { AgentPage, AgentSummary } from '@/types/agent';
 
-const AgentEditor = dynamic(() => import('./agent-editor').then(module => module.AgentEditor), { loading: () => <p role='status'>Loading dialog…</p> });
+const AgentEditor = dynamic(
+	() => import('./agent-editor').then(module => module.AgentEditor),
+	{ loading: () => <p role='status'>Loading dialog…</p> },
+);
 
-
-const AgentPlayground = dynamic(() => import('./agent-playground').then(module => module.AgentPlayground), { loading: () => <p role='status'>Loading dialog…</p> });
-
+const AgentPlayground = dynamic(
+	() =>
+		import('./agent-playground').then(
+			module => module.AgentPlayground,
+		),
+	{ loading: () => <p role='status'>Loading dialog…</p> },
+);
 
 export function Agents({ project }: { project: Project }) {
 	const [selection, setSelection] = useState<AgentSummary | 'new' | null>(
-		null,
-	),
+			null,
+		),
 		[generation, setGeneration] = useState(0);
 	const opener = useRef<HTMLElement | null>(null);
 	const [playground, setPlayground] = useState<AgentSummary | null>(null);
@@ -52,7 +59,11 @@ export function Agents({ project }: { project: Project }) {
 					</p>
 					<button
 						className='button'
-						onClick={() => setGeneration(n => n + 1)}>
+						onClick={() =>
+							setGeneration(
+								n => n + 1,
+							)
+						}>
 						Refresh
 					</button>
 				</div>
@@ -91,7 +102,9 @@ export function Agents({ project }: { project: Project }) {
 							: selection
 					}
 					canEdit={project.role !== 'viewer'}
-					onSaved={() => setGeneration(n => n + 1)}
+					onSaved={() =>
+						setGeneration(n => n + 1)
+					}
 					onClose={() => {
 						setSelection(null);
 						requestAnimationFrame(() =>
@@ -99,10 +112,10 @@ export function Agents({ project }: { project: Project }) {
 								?.isConnected
 								? opener.current.focus()
 								: document
-									.querySelector<HTMLButtonElement>(
-										'.prompt-toolbar button',
-									)
-									?.focus(),
+										.querySelector<HTMLButtonElement>(
+											'.prompt-toolbar button',
+										)
+										?.focus(),
 						);
 					}}
 				/>
@@ -110,7 +123,6 @@ export function Agents({ project }: { project: Project }) {
 		</>
 	);
 }
-
 
 function AgentList({
 	projectId,
@@ -132,16 +144,16 @@ function AgentList({
 		let valid = true;
 		void projectRequest<AgentPage>(base)
 			.then(page => {
-				if(valid) {
+				if (valid) {
 					setItems(page.items);
 					setOffset(page.next_offset);
 				}
 			})
 			.catch(e => {
-				if(valid) setError(e.message);
+				if (valid) setError(e.message);
 			})
 			.finally(() => {
-				if(valid) setLoading(false);
+				if (valid) setLoading(false);
 			});
 		return () => {
 			valid = false;
@@ -149,25 +161,25 @@ function AgentList({
 		};
 	}, [base]);
 	async function more() {
-		if(offset === null) return;
+		if (offset === null) return;
 		setLoading(true);
 		try {
 			const page = await projectRequest<AgentPage>(
 				`${base}?offset=${offset}`,
 			);
-			if(active.current) {
+			if (active.current) {
 				setItems(old => [...old, ...page.items]);
 				setOffset(page.next_offset);
 			}
-		} catch(e) {
-			if(active.current)
+		} catch (e) {
+			if (active.current)
 				setError(
 					e instanceof Error
 						? e.message
 						: 'Unable to load agents.',
 				);
 		} finally {
-			if(active.current) setLoading(false);
+			if (active.current) setLoading(false);
 		}
 	}
 	return (
@@ -222,10 +234,14 @@ function AgentList({
 								{items.map(
 									agent => (
 										<tr
-											key={agent.id}>
+											key={
+												agent.id
+											}>
 											<td>
 												<strong>
-													{agent.name}
+													{
+														agent.name
+													}
 												</strong>
 												<p className='tool-description'>
 													{agent.description ||
@@ -247,10 +263,14 @@ function AgentList({
 											</td>
 											<td>
 												v
-												{agent.revision}
+												{
+													agent.revision
+												}
 											</td>
 											<td>
-												{agent.tool_count}
+												{
+													agent.tool_count
+												}
 											</td>
 											<td>
 												{agent.enabled
@@ -261,13 +281,23 @@ function AgentList({
 												<button
 													className='button'
 													aria-label={`Manage ${agent.name}`}
-													onClick={e => onSelect(agent, e.currentTarget)}>
+													onClick={e =>
+														onSelect(
+															agent,
+															e.currentTarget,
+														)
+													}>
 													Manage
 												</button>
 												<button
 													className='button'
 													aria-label={`Playground ${agent.name}`}
-													onClick={e => onPlayground(agent, e.currentTarget)}>
+													onClick={e =>
+														onPlayground(
+															agent,
+															e.currentTarget,
+														)
+													}>
 													Playground
 												</button>
 											</td>

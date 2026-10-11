@@ -19,7 +19,9 @@ export function AgentPlayground({
 	onClose: () => void;
 }) {
 	const {
-		updateInput, editTask, refreshHistory,
+		updateInput,
+		editTask,
+		refreshHistory,
 		dialog,
 		input,
 		error,
@@ -70,7 +72,9 @@ export function AgentPlayground({
 					<button
 						className='button playground-secondary'
 						disabled={busy}
-						aria-pressed={view === 'history'}
+						aria-pressed={
+							view === 'history'
+						}
 						onClick={() =>
 							setView(
 								view ===
@@ -88,7 +92,9 @@ export function AgentPlayground({
 					{run && (
 						<button
 							className='button playground-secondary'
-							disabled={busy || pending}
+							disabled={
+								busy || pending
+							}
 							onClick={newTask}>
 							<Plus
 								size={16}
@@ -113,7 +119,14 @@ export function AgentPlayground({
 						{error || polling.error}
 					</p>
 				)}
-				{polling.stopped && <button type='button' className='button' onClick={polling.reconnect}>Reconnect execution</button>}
+				{polling.stopped && (
+					<button
+						type='button'
+						className='button'
+						onClick={polling.reconnect}>
+						Reconnect execution
+					</button>
+				)}
 				{view === 'history' ? (
 					<PlaygroundHistory
 						busy={busy}
@@ -142,7 +155,9 @@ export function AgentPlayground({
 						showDetails={showDetails}
 						setShowDetails={setShowDetails}
 						expandedTask={expandedTask}
-						setExpandedTask={setExpandedTask}
+						setExpandedTask={
+							setExpandedTask
+						}
 						copied={copied}
 						base={base}
 						pending={pending}

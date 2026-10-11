@@ -2,6 +2,7 @@
 
 import asyncio
 import socket
+from contextlib import asynccontextmanager
 from ipaddress import ip_address
 
 import httpx
@@ -98,29 +99,37 @@ def failure_code(error):
     return "connection_failed"
 
 
+@asynccontextmanager
+async def open_mcp_session(endpoint, token, settings):
+    """Own transport and session cleanup; callers retain their operation timeout."""
+    url, ip = await resolve_endpoint(endpoint, settings)
+    headers = {"Authorization": f"Bearer {token.get_secret_value()}"} if token else {}
+    async with (
+        httpx.AsyncClient(
+            transport=PinnedTransport(url, ip),
+            headers=headers,
+            follow_redirects=False,
+            trust_env=False,
+            timeout=5,
+        ) as client,
+        streamable_http_client(str(url), http_client=client) as (
+            read,
+            write,
+            _,
+        ),
+        ClientSession(read, write) as session,
+    ):
+        initialized = await session.initialize()
+        yield session, initialized
+
+
 async def probe(endpoint, token, settings, discover=False):
     try:
         async with asyncio.timeout(7):
-            url, ip = await resolve_endpoint(endpoint, settings)
-            headers = (
-                {"Authorization": f"Bearer {token.get_secret_value()}"} if token else {}
-            )
-            async with (
-                httpx.AsyncClient(
-                    transport=PinnedTransport(url, ip),
-                    headers=headers,
-                    follow_redirects=False,
-                    trust_env=False,
-                    timeout=5,
-                ) as client,
-                streamable_http_client(str(url), http_client=client) as (
-                    read,
-                    write,
-                    _,
-                ),
-                ClientSession(read, write) as session,
+            async with open_mcp_session(endpoint, token, settings) as (
+                session,
+                initialized,
             ):
-                initialized = await session.initialize()
                 tools = []
                 if discover and initialized.capabilities.tools is not None:
                     cursor = None
@@ -163,26 +172,7 @@ async def execute_tool(endpoint, token, settings, name, arguments):
     """One bounded invocation; never retry a potentially mutating call."""
     try:
         async with asyncio.timeout(7):
-            url, ip = await resolve_endpoint(endpoint, settings)
-            headers = (
-                {"Authorization": f"Bearer {token.get_secret_value()}"} if token else {}
-            )
-            async with (
-                httpx.AsyncClient(
-                    transport=PinnedTransport(url, ip),
-                    headers=headers,
-                    follow_redirects=False,
-                    trust_env=False,
-                    timeout=5,
-                ) as client,
-                streamable_http_client(str(url), http_client=client) as (
-                    read,
-                    write,
-                    _,
-                ),
-                ClientSession(read, write) as session,
-            ):
-                await session.initialize()
+            async with open_mcp_session(endpoint, token, settings) as (session, _):
                 # Avoid SDK output-schema discovery/validation, which can resolve
                 # arbitrary remote schema references inside the API process.
                 result = await session.send_request(

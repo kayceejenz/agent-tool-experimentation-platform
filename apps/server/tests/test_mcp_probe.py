@@ -1,4 +1,5 @@
 import asyncio
+import json
 import socket
 
 import httpx
@@ -103,5 +104,40 @@ def test_response_byte_limit():
         with pytest.raises(ProbeFailure, match="response_too_large"):
             async for _ in LimitedStream(Stream(), [4]):
                 pass
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_shared_session_executes_tool_once_and_returns_mcp_result(monkeypatch, fail):
+    from integrations.mcp.client import execute_tool
+
+    async def run():
+        server = FastMCP("Execution test", stateless_http=True, json_response=True)
+        calls = []
+
+        @server.tool()
+        def double(value: int) -> dict:
+            calls.append(value)
+            if fail:
+                raise ValueError("Synthetic tool failure")
+            return {"value": value * 2}
+
+        app = server.streamable_http_app()
+        original = PinnedTransport.__init__
+
+        def init(self, url, ip):
+            original(self, url, ip)
+            self.inner = httpx.ASGITransport(app=app)
+
+        monkeypatch.setattr(PinnedTransport, "__init__", init)
+        async with server.session_manager.run():
+            result = await execute_tool(
+                "http://127.0.0.1:8012/mcp", None, settings(), "double", {"value": 3}
+            )
+        assert calls == [3]
+        assert result["isError"] is fail
+        if not fail:
+            assert json.loads(result["content"][0]["text"]) == {"value": 6}
 
     asyncio.run(run())

@@ -3,8 +3,9 @@
 import asyncio
 
 from core.settings import Settings
+from integrations.agents.langchain_runtime import LangChainRuntime
 from integrations.agents.model_provider import configured_secrets
-from integrations.agents.langchain_runtime import LangChainRuntime, RuntimeStop
+from integrations.agents.runtime_errors import RuntimeStop
 from integrations.database import Database
 from integrations.mcp.credential_cipher import CredentialCipher
 

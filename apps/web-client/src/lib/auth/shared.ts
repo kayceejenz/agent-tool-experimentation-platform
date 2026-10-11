@@ -27,7 +27,9 @@ export function safeCallback(value: string | null | undefined): string {
 			path.includes('\\')
 		)
 			return DEFAULT_CALLBACK;
-		return path === '/' ? DEFAULT_CALLBACK : url.pathname + url.search;
+		return path === '/'
+			? DEFAULT_CALLBACK
+			: url.pathname + url.search;
 	} catch {
 		return DEFAULT_CALLBACK;
 	}

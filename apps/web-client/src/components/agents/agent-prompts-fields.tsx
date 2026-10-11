@@ -2,17 +2,31 @@
 import type { useAgentEditor } from '@/components/agents/use-agent-editor';
 import { PromptPicker } from './prompt-picker';
 
-type Props = Pick<ReturnType<typeof useAgentEditor>, 'system'
+type Props = Pick<
+	ReturnType<typeof useAgentEditor>,
+	| 'system'
 	| 'setSystem'
 	| 'agentPrompt'
 	| 'setAgentPrompt'
 	| 'setPickerBusy'
-	| 'disabled'> & { projectId: string };
+	| 'disabled'
+> & { projectId: string };
 
-export function AgentPromptsFields({ system, setSystem, agentPrompt, setAgentPrompt, setPickerBusy, disabled, projectId }: Props) {
+export function AgentPromptsFields({
+	system,
+	setSystem,
+	agentPrompt,
+	setAgentPrompt,
+	setPickerBusy,
+	disabled,
+	projectId,
+}: Props) {
 	return (
 		<>
-			<p className='mcp-note'>Select the prompt revisions the agent will use for this task.</p>
+			<p className='mcp-note'>
+				Select the prompt revisions the agent will use
+				for this task.
+			</p>
 			<PromptPicker
 				projectId={projectId}
 				kind='system'
@@ -29,7 +43,6 @@ export function AgentPromptsFields({ system, setSystem, agentPrompt, setAgentPro
 				onChange={setAgentPrompt}
 				onBusyChange={setPickerBusy}
 			/>
-
 		</>
 	);
 }

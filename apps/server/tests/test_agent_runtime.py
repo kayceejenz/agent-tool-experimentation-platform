@@ -321,7 +321,7 @@ def test_provider_failures_are_actionable_and_do_not_expose_payloads(
 def test_tool_payload_compacts_duplicate_mcp_data_and_excludes_metadata():
     import json
 
-    from integrations.agents.langchain_runtime import model_tool_result
+    from integrations.agents.runtime_messages import model_tool_result
 
     value = dict(
         status="success",
@@ -348,7 +348,7 @@ def test_tool_payload_compacts_duplicate_mcp_data_and_excludes_metadata():
 
 
 def test_tool_result_redacts_provider_key_before_model_dispatch():
-    from integrations.agents.langchain_runtime import model_tool_result
+    from integrations.agents.runtime_messages import model_tool_result
 
     compact = model_tool_result(
         dict(
@@ -418,7 +418,7 @@ def test_react_ten_sequential_actions_observe_results_and_preserve_lineage():
 
 
 def test_existing_saved_limits_are_used_by_react_policy():
-    from integrations.agents.langchain_runtime import runtime_instructions
+    from integrations.agents.runtime_messages import runtime_instructions
     run, _, _, _, _ = fixture([])
     assert '8 model turns' in runtime_instructions(run['snapshot'])
     assert '10 tool calls' in runtime_instructions(run['snapshot'])

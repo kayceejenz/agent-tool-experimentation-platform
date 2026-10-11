@@ -103,24 +103,50 @@ export async function traceRoute(
 	}
 }
 
-
-export async function evaluationRoute(request: Request, projectId: string, executionId: string) {
-    if (![projectId, executionId].every(id => uuid.test(id))) return json({ error: 'Execution not found.' }, 404);
-    try {
-        const query = new URLSearchParams();
-        const offset = new URL(request.url).searchParams.get('offset');
-        if (offset !== null) query.set('offset', offset);
-        const init: RequestInit = { method: request.method };
-        if (request.method === 'POST') {
-            checkOrigin(request);
-            if (!request.headers.get('content-type')?.startsWith('application/json')) return json({ error: 'Send JSON data.' }, 415);
-            init.body = JSON.stringify(await readBoundedJson(request, BODY_LIMITS.execution));
-        }
-        return json(await projectApi(`/${projectId}/executions/${executionId}/evaluations?${query}`, init, {
-            403: 'Your role cannot evaluate agents.',
-            404: 'Execution not found or access removed.',
-            409: 'Wait for pending work to finish. Older executions need a new agent run.',
-            422: 'Check the evaluation configuration and expectations.',
-        }), request.method === 'POST' ? 202 : 200);
-    } catch (error) { return routeError(error, 'Evaluations are temporarily unavailable.'); }
+export async function evaluationRoute(
+	request: Request,
+	projectId: string,
+	executionId: string,
+) {
+	if (![projectId, executionId].every(id => uuid.test(id)))
+		return json({ error: 'Execution not found.' }, 404);
+	try {
+		const query = new URLSearchParams();
+		const offset = new URL(request.url).searchParams.get('offset');
+		if (offset !== null) query.set('offset', offset);
+		const init: RequestInit = { method: request.method };
+		if (request.method === 'POST') {
+			checkOrigin(request);
+			if (
+				!request.headers
+					.get('content-type')
+					?.startsWith('application/json')
+			)
+				return json({ error: 'Send JSON data.' }, 415);
+			init.body = JSON.stringify(
+				await readBoundedJson(
+					request,
+					BODY_LIMITS.execution,
+				),
+			);
+		}
+		return json(
+			await projectApi(
+				`/${projectId}/executions/${executionId}/evaluations?${query}`,
+				init,
+				{
+					403: 'Your role cannot evaluate agents.',
+					404: 'Execution not found or access removed.',
+					409: 'Wait for pending work to finish. Older executions need a new agent run.',
+					422: 'Check the evaluation configuration and expectations.',
+				},
+			),
+			request.method === 'POST' ? 202 : 200,
+		);
+	} catch (error) {
+		return routeError(
+			error,
+			'Evaluations are temporarily unavailable.',
+		);
+	}
 }

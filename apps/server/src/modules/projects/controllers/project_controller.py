@@ -1,10 +1,10 @@
 from typing import Annotated
 from uuid import UUID
 
-from api.dependencies import current_user
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from api.dependencies import Projects as Service
+from api.dependencies import User
+from fastapi import APIRouter, HTTPException, Query
 
-from modules.auth.models.auth_user_model import AuthenticatedUser
 from modules.projects.dtos.create_project_dto import CreateProjectRequest
 from modules.projects.dtos.project_response_dto import (
     ProjectListResponse,
@@ -15,17 +15,8 @@ from modules.projects.models.error_model import (
     ProjectForbiddenError,
     ProjectNotFoundError,
 )
-from modules.projects.services.project_service import ProjectService
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-User = Annotated[AuthenticatedUser, Depends(current_user)]
-
-
-def service(request: Request) -> ProjectService:
-    return request.app.state.projects
-
-
-Service = Annotated[ProjectService, Depends(service)]
 
 
 @router.post("", response_model=ProjectResponse, status_code=201)

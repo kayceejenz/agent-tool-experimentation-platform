@@ -4,7 +4,11 @@ import { useExecutionPolling } from '@/hooks/use-execution-polling';
 import { isCancelled } from '@/lib/http/response';
 import { projectRequest } from '@/lib/projects/client';
 import type { AgentSummary } from '@/types/agent';
-import type { ExecutionOverview, ExecutionStatus, ExecutionSummary } from '@/types/execution';
+import type {
+	ExecutionOverview,
+	ExecutionStatus,
+	ExecutionSummary,
+} from '@/types/execution';
 import { useModalDialog } from '@/hooks/use-modal-dialog';
 import { projectWrite } from '@/lib/projects/client';
 
@@ -45,7 +49,9 @@ export function useAgentPlayground({
 		void projectRequest<{
 			items: ExecutionSummary[];
 			next_offset: number | null;
-		}>(`${base}/agents/${agent.id}/executions`, { signal: controller.signal })
+		}>(`${base}/agents/${agent.id}/executions`, {
+			signal: controller.signal,
+		})
 			.then(page => {
 				if (active) {
 					setHistory(page.items);
@@ -53,16 +59,30 @@ export function useAgentPlayground({
 				}
 			})
 			.catch(e => {
-				if (active && !isCancelled(e)) setError(e.message);
+				if (active && !isCancelled(e))
+					setError(e.message);
 			});
 		return () => {
 			active = false;
 			controller.abort();
 		};
 	}, [base, agent.id, refresh]);
-	const updateStatus = useCallback((value: ExecutionStatus) => setRun(old => old && old.id === value.id ? { ...old, ...value } : old), []);
+	const updateStatus = useCallback(
+		(value: ExecutionStatus) =>
+			setRun(old =>
+				old && old.id === value.id
+					? { ...old, ...value }
+					: old,
+			),
+		[],
+	);
 	const finished = useCallback(() => setRefresh(value => value + 1), []);
-	const polling = useExecutionPolling(run ? `${base}/executions/${run.id}` : null, pending, updateStatus, finished);
+	const polling = useExecutionPolling(
+		run ? `${base}/executions/${run.id}` : null,
+		pending,
+		updateStatus,
+		finished,
+	);
 	async function inspect(id: string) {
 		setBusy(true);
 		setError('');
@@ -92,11 +112,15 @@ export function useAgentPlayground({
 		const id = requestId ?? crypto.randomUUID();
 		setRequestId(id);
 		try {
-			const value = await projectWrite<{ id: string }>(`${base}/agents/${agent.id}/executions`, 'POST', {
-				input,
-				revision: agent.revision,
-				request_id: id,
-			});
+			const value = await projectWrite<{ id: string }>(
+				`${base}/agents/${agent.id}/executions`,
+				'POST',
+				{
+					input,
+					revision: agent.revision,
+					request_id: id,
+				},
+			);
 			setRequestId(null);
 			await inspect(value.id);
 			setRefresh(n => n + 1);
@@ -152,10 +176,12 @@ export function useAgentPlayground({
 			setBusy(false);
 		}
 	}
-	const budgetHint = run?.termination_reason === 'tool_result_too_large'
-		? 'The tool returned too much data. Narrow the query or request fewer results, then run again. The full result is available in execution details.'
-		: run?.termination_reason === 'context_limit'
-			? 'The conversation and tool definitions are too large. Use a smaller task or select fewer tools, then run again.' : null;
+	const budgetHint =
+		run?.termination_reason === 'tool_result_too_large'
+			? 'The tool returned too much data. Narrow the query or request fewer results, then run again. The full result is available in execution details.'
+			: run?.termination_reason === 'context_limit'
+				? 'The conversation and tool definitions are too large. Use a smaller task or select fewer tools, then run again.'
+				: null;
 	const failureHint = budgetHint ?? run?.failure_hint;
 	async function copyAnswer() {
 		if (!run?.final_answer) return;
@@ -179,16 +205,26 @@ export function useAgentPlayground({
 		setCopied(false);
 		requestAnimationFrame(() => taskInput.current?.focus());
 	}
-	function updateInput(value: string) { setInput(value); setRequestId(null); }
-	function refreshHistory() { setRefresh(value => value + 1); }
+	function updateInput(value: string) {
+		setInput(value);
+		setRequestId(null);
+	}
+	function refreshHistory() {
+		setRefresh(value => value + 1);
+	}
 	function editTask() {
 		if (!run || pending || busy) return;
-		setInput(run.input); setRun(null); setRequestId(null); setError('');
+		setInput(run.input);
+		setRun(null);
+		setRequestId(null);
+		setError('');
 		requestAnimationFrame(() => taskInput.current?.focus());
 	}
 
 	return {
-		updateInput, editTask, refreshHistory,
+		updateInput,
+		editTask,
+		refreshHistory,
 		dialog,
 		input,
 		error,

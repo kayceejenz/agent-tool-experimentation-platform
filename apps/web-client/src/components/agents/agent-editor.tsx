@@ -1,7 +1,11 @@
 'use client';
 import { type AgentSummary } from '@/types/agent';
 import { AgentHistory } from './agent-history';
-import { useAgentEditor, tabs, wizardSteps } from '@/components/agents/use-agent-editor';
+import {
+	useAgentEditor,
+	tabs,
+	wizardSteps,
+} from '@/components/agents/use-agent-editor';
 import { AgentDetailsFields } from './agent-details-fields';
 import { AgentEvaluationFields } from './agent-evaluation-fields';
 import { AgentPromptsFields } from './agent-prompts-fields';
@@ -88,7 +92,12 @@ export function AgentEditor({
 			</header>
 			<div className='mcp-sheet-body'>
 				{discard && (
-					<UnsavedChanges onKeepEditing={() => setDiscard(false)} onDiscard={onClose} />
+					<UnsavedChanges
+						onKeepEditing={() =>
+							setDiscard(false)
+						}
+						onDiscard={onClose}
+					/>
 				)}
 				{error && (
 					<p className='mcp-error' role='alert'>
@@ -105,7 +114,9 @@ export function AgentEditor({
 							(item, index) => (
 								<button
 									type='button'
-									key={item}
+									key={
+										item
+									}
 									className='button'
 									disabled={
 										busy ||
@@ -115,7 +126,11 @@ export function AgentEditor({
 										index ===
 										step
 									}
-									onClick={() => setStep(index)}>
+									onClick={() =>
+										setStep(
+											index,
+										)
+									}>
 									{index +
 										1}
 									. {item}
@@ -133,13 +148,15 @@ export function AgentEditor({
 							.filter(
 								t =>
 									t !==
-									'History' ||
+										'History' ||
 									current,
 							)
 							.map(item => (
 								<button
 									type='button'
-									key={item}
+									key={
+										item
+									}
 									className='button'
 									disabled={
 										busy ||
@@ -149,7 +166,11 @@ export function AgentEditor({
 										item ===
 										tab
 									}
-									onClick={() => setTab(item)}>
+									onClick={() =>
+										setTab(
+											item,
+										)
+									}>
 									{item}
 								</button>
 							))}
@@ -171,38 +192,109 @@ export function AgentEditor({
 					<form onSubmit={save}>
 						{(managing
 							? tab === 'Details'
-							: step === 0) && <AgentDetailsFields
-								current={current}
+							: step === 0) && (
+							<AgentDetailsFields
+								current={
+									current
+								}
 								form={form}
 								dirty={dirty}
-								disabled={disabled}
+								disabled={
+									disabled
+								}
 								toggle={toggle}
 								field={field}
-								managing={managing}
-							/>}
+								managing={
+									managing
+								}
+							/>
+						)}
 						{(managing
 							? tab === 'Prompts'
-							: step === 1) && <AgentPromptsFields
+							: step === 1) && (
+							<AgentPromptsFields
 								system={system}
-								setSystem={setSystem}
-								agentPrompt={agentPrompt}
-								setAgentPrompt={setAgentPrompt}
-								setPickerBusy={setPickerBusy}
-								disabled={disabled}
-								projectId={projectId}
-							/>}
+								setSystem={
+									setSystem
+								}
+								agentPrompt={
+									agentPrompt
+								}
+								setAgentPrompt={
+									setAgentPrompt
+								}
+								setPickerBusy={
+									setPickerBusy
+								}
+								disabled={
+									disabled
+								}
+								projectId={
+									projectId
+								}
+							/>
+						)}
 						{(managing
 							? tab === 'Model'
-							: step === 2) && <AgentModelFields form={form} disabled={disabled} field={field} />}
+							: step === 2) && (
+							<AgentModelFields
+								form={form}
+								disabled={
+									disabled
+								}
+								field={field}
+							/>
+						)}
 						{(managing
 							? tab === 'Tools'
-							: step === 3) && <AgentToolsFields tools={tools} setTools={setTools} disabled={disabled} projectId={projectId} />}
+							: step === 3) && (
+							<AgentToolsFields
+								tools={tools}
+								setTools={
+									setTools
+								}
+								disabled={
+									disabled
+								}
+								projectId={
+									projectId
+								}
+							/>
+						)}
 						{(managing
 							? tab === 'Limits'
-							: step === 4) && <AgentLimitsFields form={form} disabled={disabled} field={field} />}
-                        {(managing ? tab === 'Evaluation' : step === 5) && <AgentEvaluationFields
-                            form={form} field={field} evaluationPrompt={evaluationPrompt} setEvaluationPrompt={setEvaluationPrompt}
-                            setPickerBusy={setPickerBusy} disabled={disabled} projectId={projectId} />}
+							: step === 4) && (
+							<AgentLimitsFields
+								form={form}
+								disabled={
+									disabled
+								}
+								field={field}
+							/>
+						)}
+						{(managing
+							? tab === 'Evaluation'
+							: step === 5) && (
+							<AgentEvaluationFields
+								form={form}
+								field={field}
+								evaluationPrompt={
+									evaluationPrompt
+								}
+								setEvaluationPrompt={
+									setEvaluationPrompt
+								}
+								setPickerBusy={
+									setPickerBusy
+								}
+								disabled={
+									disabled
+								}
+								projectId={
+									projectId
+								}
+							/>
+						)}
 						{canEdit && (
 							<footer className='agent-save'>
 								<p className='mcp-note'>
@@ -229,62 +321,62 @@ export function AgentEditor({
 										}}>
 										{step >
 											0 && (
-												<button
-													type='button'
-													className='button'
-													disabled={
-														busy ||
-														pickerBusy
-													}
-													onClick={() =>
-														setStep(
-															s =>
-																s -
-																1,
-														)
-													}>
-													Back
-												</button>
-											)}
+											<button
+												type='button'
+												className='button'
+												disabled={
+													busy ||
+													pickerBusy
+												}
+												onClick={() =>
+													setStep(
+														s =>
+															s -
+															1,
+													)
+												}>
+												Back
+											</button>
+										)}
 										{step <
 											wizardSteps.length -
-											1 && (
-												<button
-													type='button'
-													className='button primary'
-													disabled={
-														busy ||
-														pickerBusy ||
-														(step ===
-															0 &&
-															!form.name.trim())
-													}
-													onClick={() =>
-														setStep(
-															s =>
-																s +
-																1,
-														)
-													}>
-													Next
-												</button>
-											)}
+												1 && (
+											<button
+												type='button'
+												className='button primary'
+												disabled={
+													busy ||
+													pickerBusy ||
+													(step ===
+														0 &&
+														!form.name.trim())
+												}
+												onClick={() =>
+													setStep(
+														s =>
+															s +
+															1,
+													)
+												}>
+												Next
+											</button>
+										)}
 										{step ===
 											wizardSteps.length -
-											1 && (
-												<button
-													className='button primary'
-													type='submit'
-													disabled={
-														disabled ||
-														!dirty ||
-														!form.name.trim()
-													}>
-													{busy
-														? 'Saving…'
-														: 'Create agent'}
-												</button>
-											)}
+												1 && (
+											<button
+												className='button primary'
+												type='submit'
+												disabled={
+													disabled ||
+													!dirty ||
+													!form.name.trim()
+												}>
+												{busy
+													? 'Saving…'
+													: 'Create agent'}
+											</button>
+										)}
 									</div>
 								)}
 								{managing && (

@@ -72,15 +72,3 @@ pnpm typecheck
 pnpm build
 pnpm start
 ```
-
-### Model selection
-
-The agent and evaluator model dropdowns offer OpenAI and Google Gemini presets with
-cost and workload guidance. Standard text token prices are reference values checked
-on 11 October 2026; follow the provider pricing links for current rates. Performance
-labels describe intended workloads rather than measured scores on your tasks.
-
-Set `AGENT_OPENAI_API_KEY` for OpenAI or `AGENT_GOOGLE_API_KEY` for Google in the
-server environment, then restart the API and worker. Google uses the Gemini API's
-OpenAI-compatible endpoint. The evaluator can inherit the agent model or use a
-separate model from either provider. Provider credentials stay on the server.

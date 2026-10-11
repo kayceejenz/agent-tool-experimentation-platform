@@ -1,38 +1,34 @@
 from typing import Annotated
 from uuid import UUID
 
-from api.dependencies import current_user
-from fastapi import APIRouter, Depends, Path, Query, Request
+from api.dependencies import Agents, User
+from fastapi import APIRouter, Path, Query
 
 from modules.agents.dtos.agent_dto import (
     AgentConfiguration,
     AvailabilityRequest,
     ReviseAgentRequest,
 )
-from modules.auth.models.auth_user_model import AuthenticatedUser
 
 router = APIRouter(prefix="/projects/{project_id}/agents", tags=["agents"])
-User = Annotated[AuthenticatedUser, Depends(current_user)]
 Offset = Annotated[int, Query(ge=0, le=100000)]
 
 
 @router.post("", status_code=201)
 async def create(
-    project_id: UUID, user: User, body: AgentConfiguration, request: Request
+    project_id: UUID, user: User, body: AgentConfiguration, agents: Agents
 ):
-    return await request.app.state.agents.create(user.id, project_id, body)
+    return await agents.create(user.id, project_id, body)
 
 
 @router.get("")
-async def list_agents(
-    project_id: UUID, user: User, request: Request, offset: Offset = 0
-):
-    return await request.app.state.agents.list(user.id, project_id, offset)
+async def list_agents(project_id: UUID, user: User, agents: Agents, offset: Offset = 0):
+    return await agents.list(user.id, project_id, offset)
 
 
 @router.get("/{agent_id}")
-async def get(project_id: UUID, agent_id: UUID, user: User, request: Request):
-    return await request.app.state.agents.get(user.id, project_id, agent_id)
+async def get(project_id: UUID, agent_id: UUID, user: User, agents: Agents):
+    return await agents.get(user.id, project_id, agent_id)
 
 
 @router.patch("/{agent_id}")
@@ -41,11 +37,9 @@ async def availability(
     agent_id: UUID,
     user: User,
     body: AvailabilityRequest,
-    request: Request,
+    agents: Agents,
 ):
-    return await request.app.state.agents.availability(
-        user.id, project_id, agent_id, body
-    )
+    return await agents.availability(user.id, project_id, agent_id, body)
 
 
 @router.post("/{agent_id}/revisions")
@@ -54,16 +48,16 @@ async def revise(
     agent_id: UUID,
     user: User,
     body: ReviseAgentRequest,
-    request: Request,
+    agents: Agents,
 ):
-    return await request.app.state.agents.revise(user.id, project_id, agent_id, body)
+    return await agents.revise(user.id, project_id, agent_id, body)
 
 
 @router.get("/{agent_id}/revisions")
 async def history(
-    project_id: UUID, agent_id: UUID, user: User, request: Request, offset: Offset = 0
+    project_id: UUID, agent_id: UUID, user: User, agents: Agents, offset: Offset = 0
 ):
-    return await request.app.state.agents.history(user.id, project_id, agent_id, offset)
+    return await agents.history(user.id, project_id, agent_id, offset)
 
 
 @router.get("/{agent_id}/revisions/{revision}")
@@ -72,6 +66,6 @@ async def revision(
     agent_id: UUID,
     revision: Annotated[int, Path(ge=1)],
     user: User,
-    request: Request,
+    agents: Agents,
 ):
-    return await request.app.state.agents.get(user.id, project_id, agent_id, revision)
+    return await agents.get(user.id, project_id, agent_id, revision)

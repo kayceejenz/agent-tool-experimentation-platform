@@ -1,10 +1,10 @@
 from typing import Annotated
 from uuid import UUID
 
-from api.dependencies import current_user
-from fastapi import APIRouter, Depends, Query, Request
+from api.dependencies import McpServers as Service
+from api.dependencies import User
+from fastapi import APIRouter, Query
 
-from modules.auth.models.auth_user_model import AuthenticatedUser
 from modules.mcp_servers.dtos.server_request_dto import (
     CreateServerRequest,
     ProbeServerRequest,
@@ -16,17 +16,8 @@ from modules.mcp_servers.dtos.server_response_dto import (
     ServerProbeResponse,
     ServerResponse,
 )
-from modules.mcp_servers.services.server_service import ServerService
 
 router = APIRouter(prefix="/projects/{project_id}/mcp-servers", tags=["mcp-servers"])
-User = Annotated[AuthenticatedUser, Depends(current_user)]
-
-
-def service(request: Request) -> ServerService:
-    return request.app.state.mcp_servers
-
-
-Service = Annotated[ServerService, Depends(service)]
 
 
 @router.post("", response_model=ServerResponse, status_code=201)
@@ -37,7 +28,9 @@ async def create_server(
 
 
 @router.post("/probe", response_model=ServerProbeResponse)
-async def probe_server(project_id: UUID, body: ProbeServerRequest, user: User, servers: Service):
+async def probe_server(
+    project_id: UUID, body: ProbeServerRequest, user: User, servers: Service
+):
     return await servers.probe_unsaved(user.id, project_id, body)
 
 

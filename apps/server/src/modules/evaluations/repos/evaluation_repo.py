@@ -1,11 +1,11 @@
 from uuid import uuid4
 
+from core.serialization import json_value
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from modules.agents.models.error_model import AgentError
 from modules.agents.repos.agent_repo import AgentRepository
-from modules.executions.repos.execution_repo import json_value
 from modules.tools.helpers.validation import redact
 
 
@@ -13,7 +13,7 @@ class EvaluationRepository:
     def __init__(self, database, secret=None):
         self.database, self.secret = database, secret
 
-    def safe(self, value):
+    def redacted_jsonb(self, value):
         return Jsonb(redact(json_value(value), self.secret))
 
     async def execution(self, db, user_id, project_id, execution_id, write=False):
@@ -47,7 +47,7 @@ class EvaluationRepository:
     async def resolve_profile(self, db, project_id, run, body):
         if body.profile is None:
             return run["snapshot"].get("evaluation_profile")
-        from modules.evaluations.services.evaluation_service import profile_snapshot
+        from modules.evaluations.helpers.rubric import profile_snapshot
 
         config = body.profile.model_dump(mode="json")
         reference = config["prompt"]
@@ -133,7 +133,7 @@ class EvaluationRepository:
                             execution_id,
                             body.request_id,
                             Jsonb(json_value(profile)),
-                            self.safe(expectations),
+                            self.redacted_jsonb(expectations),
                             user_id,
                             execution_id,
                         ),
@@ -179,10 +179,10 @@ class EvaluationRepository:
                 "UPDATE agent_platform.execution_evaluations SET status=%s,metrics=%s,report=%s,evidence_hash=%s,usage=%s,error_code=%s,finished_at=now() WHERE id=%s AND status='running'",
                 (
                     status,
-                    self.safe(metrics),
-                    self.safe(report),
+                    self.redacted_jsonb(metrics),
+                    self.redacted_jsonb(report),
                     evidence_hash,
-                    self.safe(usage),
+                    self.redacted_jsonb(usage),
                     error_code,
                     job["id"],
                 ),

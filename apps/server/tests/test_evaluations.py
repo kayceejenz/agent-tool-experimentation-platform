@@ -1,21 +1,15 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 from core.settings import Settings
-from modules.evaluations.dtos.evaluation_dto import Expectations
 from langchain_core.messages import AIMessage
-from modules.evaluations.services.evaluation_service import (
-    DIMENSIONS,
-    Evaluator,
-    code_checks,
-    evidence_package,
-    profile_snapshot,
-    unknown_report,
-    validate_report,
-)
+from modules.evaluations.dtos.evaluation_dto import Expectations
+from modules.evaluations.helpers.evidence import code_checks, evidence_package
+from modules.evaluations.helpers.reports import validate_report
+from modules.evaluations.helpers.rubric import DIMENSIONS, profile_snapshot
+from modules.evaluations.services.evaluation_service import Evaluator
 from pydantic import ValidationError
 
 
@@ -260,7 +254,11 @@ def test_real_sdk_structured_output_with_synthetic_transport(mode, provider):
     captured = []
 
     def respond(request):
-        assert request.url.host == ("generativelanguage.googleapis.com" if provider == "google" else "api.openai.com")
+        assert request.url.host == (
+            "generativelanguage.googleapis.com"
+            if provider == "google"
+            else "api.openai.com"
+        )
         body = json.loads(request.content)
         captured.append(body)
         message = {"role": "assistant", "content": json.dumps(report)}
@@ -297,7 +295,9 @@ def test_real_sdk_structured_output_with_synthetic_transport(mode, provider):
                 api_key="synthetic-key",
                 max_retries=0,
                 use_responses_api=False,
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/" if provider == "google" else "https://api.openai.com/v1",
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+                if provider == "google"
+                else "https://api.openai.com/v1",
                 http_async_client=client,
             )
             repo = Repository(run, spans)

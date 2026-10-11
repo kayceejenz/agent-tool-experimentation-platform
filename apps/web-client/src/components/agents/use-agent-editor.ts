@@ -1,7 +1,15 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
 import { projectRequest, ProjectRequestError } from '@/lib/projects/client';
-import { configOf, newAgent, type Agent, type AgentConfig, type AgentSummary, type PromptBinding, type ToolBinding } from '@/types/agent';
+import {
+	configOf,
+	newAgent,
+	type Agent,
+	type AgentConfig,
+	type AgentSummary,
+	type PromptBinding,
+	type ToolBinding,
+} from '@/types/agent';
 import { useModalDialog } from '@/hooks/use-modal-dialog';
 import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { projectWrite } from '@/lib/projects/client';
@@ -16,7 +24,14 @@ export const tabs = [
 	'History',
 ] as const;
 
-export const wizardSteps = ['Details', 'Prompts', 'Model', 'Tools', 'Limits', 'Evaluation'] as const;
+export const wizardSteps = [
+	'Details',
+	'Prompts',
+	'Model',
+	'Tools',
+	'Limits',
+	'Evaluation',
+] as const;
 
 type Tab = (typeof tabs)[number];
 
@@ -40,7 +55,8 @@ export function useAgentEditor({
 		[agentPrompt, setAgentPrompt] = useState<PromptBinding | null>(
 			null,
 		),
-		[evaluationPrompt, setEvaluationPrompt] = useState<PromptBinding | null>(null),
+		[evaluationPrompt, setEvaluationPrompt] =
+			useState<PromptBinding | null>(null),
 		[tools, setTools] = useState<ToolBinding[]>([]),
 		[tab, setTab] = useState<Tab>('Details'),
 		[step, setStep] = useState<number>(0);
@@ -58,7 +74,10 @@ export function useAgentEditor({
 		...form,
 		system_prompt: reference(system),
 		agent_prompt: reference(agentPrompt),
-		evaluation_profile: { ...form.evaluation_profile, prompt: reference(evaluationPrompt) },
+		evaluation_profile: {
+			...form.evaluation_profile,
+			prompt: reference(evaluationPrompt),
+		},
 		tools: tools
 			.map(t => ({ id: t.id, revision: t.revision }))
 			.sort((a, b) => a.id.localeCompare(b.id)),
@@ -79,18 +98,20 @@ export function useAgentEditor({
 	}
 
 	useEffect(() => {
-		if(!initial) return;
+		if (!initial) return;
 		let active = true;
 		const controller = new AbortController();
-		void projectRequest<Agent>(`${base}/${initial.id}`, { signal: controller.signal })
+		void projectRequest<Agent>(`${base}/${initial.id}`, {
+			signal: controller.signal,
+		})
 			.then(value => {
-				if(active) apply(value);
+				if (active) apply(value);
 			})
 			.catch(e => {
-				if(active) setError(e.message);
+				if (active) setError(e.message);
 			})
 			.finally(() => {
-				if(active) setLoading(false);
+				if (active) setLoading(false);
 			});
 		return () => {
 			active = false;
@@ -104,15 +125,15 @@ export function useAgentEditor({
 				? e.message
 				: 'Unable to save agent.',
 		);
-		if(
+		if (
 			e instanceof ProjectRequestError &&
 			[403, 404].includes(e.status)
 		)
 			setDenied(true);
 	}
 	function close() {
-		if(busy || pickerBusy) return;
-		if(dirty) {
+		if (busy || pickerBusy) return;
+		if (dirty) {
 			setDiscard(true);
 			return;
 		}
@@ -120,41 +141,49 @@ export function useAgentEditor({
 	}
 	async function save(event: FormEvent) {
 		event.preventDefault();
-		if(disabled) return;
+		if (disabled) return;
 		setBusy(true);
 		setError('');
 		setNotice('');
 		try {
-			const saved = await projectWrite<Agent>(current
-				? `${base}/${current.id}/revisions`
-				: base, 'POST', {
-				...payload,
-				...(current
-					? {
-						base_revision:
-							current.revision,
-					}
-					: {}),
-			});
+			const saved = await projectWrite<Agent>(
+				current
+					? `${base}/${current.id}/revisions`
+					: base,
+				'POST',
+				{
+					...payload,
+					...(current
+						? {
+								base_revision:
+									current.revision,
+							}
+						: {}),
+				},
+			);
 			apply(saved);
 			setNotice(`Revision ${saved.revision} saved.`);
 			onSaved();
-		} catch(e) {
+		} catch (e) {
 			fail(e);
 		} finally {
 			setBusy(false);
 		}
 	}
 	async function toggle() {
-		if(!current || dirty || disabled) return;
+		if (!current || dirty || disabled) return;
 		setBusy(true);
 		setError('');
 		setNotice('');
 		try {
-			const saved = await projectWrite<Agent>(`${base}/${current.id}`, 'PATCH', {
-				enabled: !current.enabled,
-				base_revision: current.revision,
-			});
+			const saved = await projectWrite<Agent>(
+				`${base}/${current.id}`,
+				'PATCH',
+				{
+					enabled: !current.enabled,
+					base_revision: current.revision,
+				},
+			);
 			apply(saved);
 			setNotice(
 				saved.enabled
@@ -162,7 +191,7 @@ export function useAgentEditor({
 					: 'Agent disabled.',
 			);
 			onSaved();
-		} catch(e) {
+		} catch (e) {
 			fail(e);
 		} finally {
 			setBusy(false);

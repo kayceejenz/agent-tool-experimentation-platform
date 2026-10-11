@@ -1,8 +1,11 @@
+from contextlib import asynccontextmanager
 from uuid import uuid4
+
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
-from modules.mcp_servers.repos.server_repo import ServerRepository
+
 from modules.mcp_servers.models.error_model import McpConnectionError
+from modules.mcp_servers.repos.server_repo import ServerRepository
 
 SELECT = """SELECT t.*, s.name AS server_name, s.enabled AS server_enabled,
  r.definition FROM agent_platform.mcp_tools t
@@ -49,6 +52,84 @@ class ToolRepository:
     def __init__(self, database):
         self.database = database
 
+    @asynccontextmanager
+    async def execution_context(self, user_id, project_id, tool_id, request_id, digest):
+        """Hold authorization/tool locks through validation and reservation commit."""
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await ServerRepository.member(db, user_id, project_id, True)
+                tool = await self.read(db, project_id, tool_id, True)
+                previous = await (
+                    await db.execute(
+                        """SELECT id, status, result, error_code, duration_ms, created_at,
+                                  revision, inputs
+                           FROM agent_platform.tool_executions
+                           WHERE tool_id=%s AND user_id=%s AND request_id=%s
+                             AND arguments_hash=%s""",
+                        (tool_id, user_id, request_id, digest),
+                    )
+                ).fetchone()
+                if previous is None:
+                    conflict = await (
+                        await db.execute(
+                            """SELECT id FROM agent_platform.tool_executions
+                               WHERE tool_id=%s AND user_id=%s AND request_id=%s""",
+                            (tool_id, user_id, request_id),
+                        )
+                    ).fetchone()
+                    if conflict:
+                        raise McpConnectionError(
+                            409, "Request ID already used with different inputs"
+                        )
+                yield db, tool, previous
+
+    async def execution_target(self, db, project_id, server_id):
+        server = await ServerRepository.read(db, project_id, server_id)
+        credential = None
+        if server.auth_type == "bearer":
+            row = await (
+                await db.execute(
+                    "SELECT encrypted_value FROM agent_platform.mcp_server_credentials WHERE server_id=%s",
+                    (server_id,),
+                )
+            ).fetchone()
+            credential = row["encrypted_value"] if row else None
+        return server, credential
+
+    async def reserve_execution(self, db, tool_id, user_id, body, digest, inputs):
+        execution_id = uuid4()
+        await db.execute(
+            """INSERT INTO agent_platform.tool_executions
+                   (id, tool_id, revision, user_id, request_id, arguments_hash, inputs, status)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,'running')""",
+            (
+                execution_id,
+                tool_id,
+                body.revision,
+                user_id,
+                body.request_id,
+                digest,
+                Jsonb(inputs),
+            ),
+        )
+        return execution_id
+
+    async def finish_execution(
+        self, execution_id, status, result, error_code, duration_ms
+    ):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                return await (
+                    await db.execute(
+                        """UPDATE agent_platform.tool_executions
+                           SET status=%s, result=%s, error_code=%s, duration_ms=%s
+                           WHERE id=%s
+                           RETURNING id, revision, inputs, status, result, error_code,
+                                     duration_ms, created_at""",
+                        (status, Jsonb(result), error_code, duration_ms, execution_id),
+                    )
+                ).fetchone()
+
     @staticmethod
     async def read(db, project_id, tool_id, lock=False):
         row = await (
@@ -63,13 +144,22 @@ class ToolRepository:
             raise McpConnectionError(404, "Tool not found")
         return row
 
-    async def list(self, user_id, project_id, server_id, offset, query="", summary=False):
+    async def list(
+        self, user_id, project_id, server_id, offset, query="", summary=False
+    ):
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
                 await ServerRepository.member(db, user_id, project_id, False)
                 rows = await (
                     await db.execute(
-                        (SELECT.replace("r.definition", "r.definition->>'description' AS description") if summary else SELECT)
+                        (
+                            SELECT.replace(
+                                "r.definition",
+                                "r.definition->>'description' AS description",
+                            )
+                            if summary
+                            else SELECT
+                        )
                         + " WHERE s.project_id=%s AND (%s::uuid IS NULL OR s.id=%s) AND strpos(lower(t.name),lower(%s))>0 ORDER BY s.name,t.name,t.id LIMIT 101 OFFSET %s",
                         (project_id, server_id, server_id, query, offset),
                     )
@@ -108,7 +198,7 @@ class ToolRepository:
                     )
                 ).fetchall()
                 # A worker may have stopped after dispatch. Never imply it is safe to retry.
-                from datetime import datetime, UTC
+                from datetime import UTC, datetime
 
                 for row in rows:
                     if (
@@ -123,10 +213,12 @@ class ToolRepository:
             async with conn.cursor(row_factory=dict_row) as db:
                 await ServerRepository.member(db, user_id, project_id, False)
                 await self.read(db, project_id, tool_id)
-                row = await (await db.execute(
-                    "SELECT id,revision,inputs,status,result,error_code,duration_ms,created_at FROM agent_platform.tool_executions WHERE tool_id=%s AND user_id=%s AND request_id=%s",
-                    (tool_id, user_id, request_id),
-                )).fetchone()
+                row = await (
+                    await db.execute(
+                        "SELECT id,revision,inputs,status,result,error_code,duration_ms,created_at FROM agent_platform.tool_executions WHERE tool_id=%s AND user_id=%s AND request_id=%s",
+                        (tool_id, user_id, request_id),
+                    )
+                ).fetchone()
                 if not row:
                     raise McpConnectionError(404, "Tool operation not found")
                 return row
