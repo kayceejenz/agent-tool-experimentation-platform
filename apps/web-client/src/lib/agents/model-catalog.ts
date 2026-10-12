@@ -55,7 +55,7 @@ export const modelCatalog = [
 	},
 ] as const;
 export const modelOptionLabel = (model: (typeof modelCatalog)[number]) =>
-	`${model.name} · ${model.tier} · ${model.performance}`;
+	`${model.name} · ${model.tier}`;
 export const pricingSources = {
 	openai: 'https://developers.openai.com/api/docs/pricing',
 	google: 'https://ai.google.dev/gemini-api/docs/pricing',

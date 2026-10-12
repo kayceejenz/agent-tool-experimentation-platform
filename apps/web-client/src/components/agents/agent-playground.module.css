@@ -656,3 +656,69 @@
 		justify-content: flex-end;
 	}
 }
+
+.root.page {
+	width: 100%;
+	height: auto;
+	max-height: none;
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	border-radius: 12px;
+	box-shadow: none;
+	overflow: visible;
+}
+.root.page :global(.playground-body) {
+	overflow: visible;
+	padding: 28px;
+}
+.root.page :global(.playground-header) {
+	grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.root.page :global(.execution-answer) {
+	font-size: 16px;
+	max-width: 78ch;
+}
+.root.page :global(.playground-close) {
+	width: auto;
+	min-height: 44px;
+	padding: 0 12px;
+	font-size: 14px;
+}
+.root.page :global(.playground-message-label),
+.root.page :global(.playground-subtitle),
+.root.page :global(.playground-run-actions),
+.root.page :global(.playground-task-message p),
+.root.page :global(.playground-details > summary) {
+	font-size: 14px;
+}
+@media (max-width: 640px) {
+	.root.page :global(.playground-header) {
+		grid-template-columns: 1fr;
+		padding: 20px;
+	}
+	.root.page :global(.playground-header-actions) {
+		flex-wrap: wrap;
+		justify-content: flex-start;
+	}
+	.root.page :global(.playground-close) {
+		justify-self: start;
+	}
+	.root.page :global(.playground-body) {
+		padding: 20px;
+	}
+}
+
+.root.page :global(.playground-composer) {
+	padding: 0;
+	max-width: 760px;
+}
+.root.page :global(.playground-intro) {
+	margin-bottom: 20px;
+}
+.root.page :global(.playground-intro h3) {
+	font-size: 22px;
+}
+.root.page :global(.playground-heading .eyebrow) {
+	display: none;
+}

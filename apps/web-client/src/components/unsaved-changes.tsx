@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useRef } from 'react';
 
 export function UnsavedChanges({
 	onKeepEditing,
@@ -7,6 +8,16 @@ export function UnsavedChanges({
 	onKeepEditing: () => void;
 	onDiscard: () => void;
 }) {
+	const keepEditing = useRef<HTMLButtonElement>(null);
+	useEffect(() => {
+		const opener = document.activeElement as HTMLElement | null;
+		keepEditing.current?.focus();
+		return () => {
+			requestAnimationFrame(() => {
+				if (opener?.isConnected) opener.focus();
+			});
+		};
+	}, []);
 	return (
 		<div className='prompt-discard' role='alert'>
 			<p>You have unsaved changes.</p>
@@ -14,6 +25,7 @@ export function UnsavedChanges({
 				<button
 					className='button'
 					type='button'
+					ref={keepEditing}
 					onClick={onKeepEditing}>
 					Keep editing
 				</button>

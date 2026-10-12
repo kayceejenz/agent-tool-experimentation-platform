@@ -159,17 +159,17 @@ export function Tools({ project }: { project: Project }) {
 						<table className='tool-table'>
 							<thead>
 								<tr>
-									<th>
+									<th scope='col'>
 										Tool
 									</th>
-									<th>
+									<th scope='col'>
 										MCP
 										server
 									</th>
-									<th>
+									<th scope='col'>
 										Availability
 									</th>
-									<th>
+									<th scope='col'>
 										Action
 									</th>
 								</tr>
@@ -181,7 +181,7 @@ export function Tools({ project }: { project: Project }) {
 											key={
 												tool.id
 											}>
-											<td>
+											<td data-label='Tool'>
 												<strong>
 													{
 														tool.name
@@ -200,7 +200,7 @@ export function Tools({ project }: { project: Project }) {
 													}
 												</small>
 											</td>
-											<td>
+											<td data-label='MCP server'>
 												{
 													tool.server_name
 												}
@@ -210,7 +210,7 @@ export function Tools({ project }: { project: Project }) {
 														: 'Connection disabled'}
 												</small>
 											</td>
-											<td>
+											<td data-label='Availability'>
 												<button
 													type='button'
 													className='mcp-toggle'
@@ -245,7 +245,7 @@ export function Tools({ project }: { project: Project }) {
 													</small>
 												)}
 											</td>
-											<td>
+											<td data-label='Action'>
 												<button
 													className='button'
 													onClick={event => {

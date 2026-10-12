@@ -105,17 +105,10 @@ export function AgentDetailsFields({
 					) : (
 						<p className='mcp-note'>
 							Configuration complete.
-							Provider compatibility
-							and credentials will be
-							checked when model
-							integration is added.
+							Enable this agent to run
+							a task.
 						</p>
 					)}
-					<p className='mcp-note'>
-						Model execution and the
-						playground are not available
-						yet.
-					</p>
 				</section>
 			)}
 		</>

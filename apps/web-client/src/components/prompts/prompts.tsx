@@ -4,10 +4,17 @@ import { useEffect, useRef, useState } from 'react';
 import { ProjectSync } from '@/components/projects/project-provider';
 import { projectRequest } from '@/lib/projects/client';
 import type { Project } from '@/types/workspace';
-import { promptTypes, type PromptPage, type PromptSummary, type PromptType } from '@/types/prompt';
+import {
+	promptTypes,
+	type PromptPage,
+	type PromptSummary,
+	type PromptType,
+} from '@/types/prompt';
 
-const PromptEditor = dynamic(() => import('./prompt-editor').then(module => module.PromptEditor), { loading: () => <p role='status'>Loading dialog…</p> });
-
+const PromptEditor = dynamic(
+	() => import('./prompt-editor').then(module => module.PromptEditor),
+	{ loading: () => <p role='status'>Loading dialog…</p> },
+);
 
 export function Prompts({ project }: { project: Project }) {
 	const [type, setType] = useState<PromptType | ''>('');
@@ -50,8 +57,8 @@ export function Prompts({ project }: { project: Project }) {
 								setType(
 									e.target
 										.value as
-									| PromptType
-									| '',
+										| PromptType
+										| '',
 								)
 							}>
 							<option value=''>
@@ -65,9 +72,15 @@ export function Prompts({ project }: { project: Project }) {
 									item,
 								]) => (
 									<option
-										key={value}
-										value={value}>
-										{item.label}
+										key={
+											value
+										}
+										value={
+											value
+										}>
+										{
+											item.label
+										}
 									</option>
 								),
 							)}
@@ -75,7 +88,11 @@ export function Prompts({ project }: { project: Project }) {
 					</label>
 					<button
 						className='button'
-						onClick={() => setGeneration(old => old + 1)}>
+						onClick={() =>
+							setGeneration(
+								old => old + 1,
+							)
+						}>
 						Refresh
 					</button>
 				</div>
@@ -98,7 +115,9 @@ export function Prompts({ project }: { project: Project }) {
 							: selection
 					}
 					canEdit={canEdit}
-					onSaved={() => setGeneration(old => old + 1)}
+					onSaved={() =>
+						setGeneration(old => old + 1)
+					}
 					onClose={() => {
 						setSelection(null);
 						requestAnimationFrame(() =>
@@ -106,10 +125,10 @@ export function Prompts({ project }: { project: Project }) {
 								?.isConnected
 								? opener.current.focus()
 								: document
-									.querySelector<HTMLButtonElement>(
-										'.prompt-toolbar button',
-									)
-									?.focus(),
+										.querySelector<HTMLButtonElement>(
+											'.prompt-toolbar button',
+										)
+										?.focus(),
 						);
 					}}
 				/>
@@ -117,7 +136,6 @@ export function Prompts({ project }: { project: Project }) {
 		</>
 	);
 }
-
 
 function PromptList({
 	projectId,
@@ -140,16 +158,16 @@ function PromptList({
 		let valid = true;
 		void projectRequest<PromptPage>(path)
 			.then(page => {
-				if(valid) {
+				if (valid) {
 					setItems(page.items);
 					setOffset(page.next_offset);
 				}
 			})
 			.catch(e => {
-				if(valid) setError(e.message);
+				if (valid) setError(e.message);
 			})
 			.finally(() => {
-				if(valid) setLoading(false);
+				if (valid) setLoading(false);
 			});
 		return () => {
 			valid = false;
@@ -157,26 +175,26 @@ function PromptList({
 		};
 	}, [path]);
 	async function more() {
-		if(offset === null) return;
+		if (offset === null) return;
 		setLoading(true);
 		setError('');
 		try {
 			const page = await projectRequest<PromptPage>(
 				`${path}&offset=${offset}`,
 			);
-			if(active.current) {
+			if (active.current) {
 				setItems(old => [...old, ...page.items]);
 				setOffset(page.next_offset);
 			}
-		} catch(e) {
-			if(active.current)
+		} catch (e) {
+			if (active.current)
 				setError(
 					e instanceof Error
 						? e.message
 						: 'Unable to load prompts.',
 				);
 		} finally {
-			if(active.current) setLoading(false);
+			if (active.current) setLoading(false);
 		}
 	}
 	return (
@@ -211,20 +229,20 @@ function PromptList({
 						<table className='tool-table'>
 							<thead>
 								<tr>
-									<th>
+									<th scope='col'>
 										Name
 									</th>
-									<th>
+									<th scope='col'>
 										Type
 									</th>
-									<th>
+									<th scope='col'>
 										Revision
 									</th>
-									<th>
+									<th scope='col'>
 										Last
 										updated
 									</th>
-									<th>
+									<th scope='col'>
 										Action
 									</th>
 								</tr>
@@ -233,17 +251,21 @@ function PromptList({
 								{items.map(
 									prompt => (
 										<tr
-											key={prompt.id}>
-											<td>
+											key={
+												prompt.id
+											}>
+											<td data-label='Name'>
 												<strong>
-													{prompt.name}
+													{
+														prompt.name
+													}
 												</strong>
 												<p className='tool-description'>
 													{prompt.description ||
 														'No description'}
 												</p>
 											</td>
-											<td>
+											<td data-label='Type'>
 												<span className='badge'>
 													{
 														promptTypes[
@@ -254,21 +276,32 @@ function PromptList({
 													}
 												</span>
 											</td>
-											<td>
+											<td data-label='Revision'>
 												v
-												{prompt.revision}
+												{
+													prompt.revision
+												}
 											</td>
-											<td>
+											<td data-label='Last updated'>
 												<time
-													dateTime={prompt.created_at}>
-													{new Date(prompt.created_at).toLocaleString()}
+													dateTime={
+														prompt.created_at
+													}>
+													{new Date(
+														prompt.created_at,
+													).toLocaleString()}
 												</time>
 											</td>
-											<td>
+											<td data-label='Action'>
 												<button
 													className='button'
 													aria-label={`Manage ${prompt.name}`}
-													onClick={e => onSelect(prompt, e.currentTarget)}>
+													onClick={e =>
+														onSelect(
+															prompt,
+															e.currentTarget,
+														)
+													}>
 													Manage
 												</button>
 											</td>

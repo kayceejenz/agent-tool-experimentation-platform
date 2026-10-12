@@ -1,4 +1,5 @@
 'use client';
+import { ReadableOutput } from './readable-output';
 import type { ToolExecution } from '@/types/tool';
 
 export function Execution({ execution }: { execution: ToolExecution }) {
@@ -6,10 +7,29 @@ export function Execution({ execution }: { execution: ToolExecution }) {
 		execution.result && typeof execution.result === 'object'
 			? (execution.result as Record<string, unknown>)
 			: null;
-	const output =
+	let output =
 		envelope?.structuredContent ??
 		envelope?.content ??
 		execution.result;
+	if (
+		Array.isArray(output) &&
+		output.every(
+			block =>
+				block &&
+				typeof block === 'object' &&
+				(block as Record<string, unknown>).type ===
+					'text',
+		)
+	) {
+		const text = output
+			.map(block => (block as Record<string, unknown>).text)
+			.join('\n');
+		try {
+			output = JSON.parse(text);
+		} catch {
+			output = text;
+		}
+	}
 	return (
 		<div>
 			<p className='tool-result-meta'>
@@ -37,9 +57,10 @@ export function Execution({ execution }: { execution: ToolExecution }) {
 					)}
 				</pre>
 			</details>
-			<pre className='tool-output'>
-				{JSON.stringify(output, null, 2)}
-			</pre>
+			<div className='tool-output-readable'>
+				<h4>Result</h4>
+				<ReadableOutput value={output} />
+			</div>
 			<details>
 				<summary>Raw response</summary>
 				<pre>

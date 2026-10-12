@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import type { useAgentPlayground } from './use-agent-playground';
 import { ArrowUp } from 'lucide-react';
 import type { AgentSummary } from '@/types/agent';
@@ -6,7 +7,7 @@ import type { AgentSummary } from '@/types/agent';
 type Props = Pick<
 	ReturnType<typeof useAgentPlayground>,
 	'updateInput' | 'input' | 'busy' | 'taskInput' | 'start'
-> & { canRun: boolean; agent: AgentSummary };
+> & { canRun: boolean; agent: AgentSummary; projectId: string };
 
 export function PlaygroundComposer({
 	updateInput,
@@ -16,6 +17,7 @@ export function PlaygroundComposer({
 	start,
 	canRun,
 	agent,
+ projectId,
 }: Props) {
 	return (
 		<section className='playground-composer' aria-label='Run agent'>
@@ -39,7 +41,7 @@ export function PlaygroundComposer({
 						ref={taskInput}
 						value={input}
 						rows={5}
-						placeholder='Provide your task here...'
+						placeholder='Describe the outcome you need and any constraints…'
 						maxLength={16000}
 						disabled={busy || !canRun}
 						onChange={event =>
@@ -98,8 +100,7 @@ export function PlaygroundComposer({
 				)}
 				{canRun && !agent.enabled && (
 					<p className='mcp-note'>
-						Enable this agent in Manage to
-						run a task.
+						Enable this agent in its configuration to run a task. <Link href={`/projects/${projectId}/agents/${agent.id}`}>Open configuration</Link>
 					</p>
 				)}
 			</form>

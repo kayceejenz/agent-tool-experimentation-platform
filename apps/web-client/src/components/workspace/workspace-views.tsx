@@ -1,7 +1,7 @@
+import { ProjectDashboard } from '@/components/projects/project-dashboard';
 import { ProjectRows } from '@/components/projects/project-list';
 import { ProjectSync } from '@/components/projects/project-provider';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
 import type { Project } from '@/types/workspace';
 
 export function PageHeader({
@@ -68,7 +68,6 @@ export function ProjectTabs({
 }
 
 export function ProjectOverview({ project }: { project: Project }) {
-	const base = `/projects/${project.id}`;
 	return (
 		<>
 			<PageHeader
@@ -78,19 +77,7 @@ export function ProjectOverview({ project }: { project: Project }) {
 				}></PageHeader>
 			<ProjectSync project={project} />
 			<ProjectTabs project={project} />
-			<section className='panel empty-state'>
-				<h2>Start with a connection</h2>
-				<p>
-					Add an MCP server to configure the tools
-					this project can connect to.
-				</p>
-				<Link
-					className='button primary'
-					href={`${base}/servers`}>
-					View MCP Servers{' '}
-					<ArrowRight size={16} />
-				</Link>
-			</section>
+			<ProjectDashboard project={project} />
 		</>
 	);
 }

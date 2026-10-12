@@ -29,8 +29,7 @@ export const wizardSteps = [
 	'Prompts',
 	'Model',
 	'Tools',
-	'Limits',
-	'Evaluation',
+	'Review',
 ] as const;
 
 type Tab = (typeof tabs)[number];
@@ -41,14 +40,16 @@ export function useAgentEditor({
 	canEdit,
 	onClose,
 	onSaved,
+	pageMode = false,
 }: {
 	projectId: string;
 	initial: AgentSummary | null;
 	canEdit: boolean;
 	onClose: () => void;
-	onSaved: () => void;
+	onSaved: (agent: Agent) => void;
+	pageMode?: boolean;
 }) {
-	const dialog = useModalDialog();
+	const dialog = useModalDialog(!pageMode);
 	const [current, setCurrent] = useState<Agent | null>(null),
 		[form, setForm] = useState<AgentConfig>(newAgent),
 		[system, setSystem] = useState<PromptBinding | null>(null),
@@ -60,6 +61,7 @@ export function useAgentEditor({
 		[tools, setTools] = useState<ToolBinding[]>([]),
 		[tab, setTab] = useState<Tab>('Details'),
 		[step, setStep] = useState<number>(0);
+	const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
 	const [loading, setLoading] = useState(!!initial),
 		[busy, setBusy] = useState(false),
 		[pickerBusy, setPickerBusy] = useState(false),
@@ -97,11 +99,12 @@ export function useAgentEditor({
 		setTools(value.tools);
 	}
 
+	const identifier = initial?.id;
 	useEffect(() => {
-		if (!initial) return;
+		if (!identifier || current?.id === identifier) return;
 		let active = true;
 		const controller = new AbortController();
-		void projectRequest<Agent>(`${base}/${initial.id}`, {
+		void projectRequest<Agent>(`${base}/${identifier}`, {
 			signal: controller.signal,
 		})
 			.then(value => {
@@ -117,8 +120,8 @@ export function useAgentEditor({
 			active = false;
 			controller.abort();
 		};
-	}, [base, initial]);
-	useUnsavedChanges(dirty);
+	}, [base, identifier, current?.id]);
+	useUnsavedChanges(dirty, pageMode ? href => { setPendingNavigation(href); setDiscard(true); } : undefined);
 	function fail(e: unknown) {
 		setError(
 			e instanceof Error
@@ -163,7 +166,7 @@ export function useAgentEditor({
 			);
 			apply(saved);
 			setNotice(`Revision ${saved.revision} saved.`);
-			onSaved();
+			onSaved(saved);
 		} catch (e) {
 			fail(e);
 		} finally {
@@ -190,7 +193,8 @@ export function useAgentEditor({
 					? 'Agent enabled. Open its playground to run a task.'
 					: 'Agent disabled.',
 			);
-			onSaved();
+			onSaved(saved);
+			return saved;
 		} catch (e) {
 			fail(e);
 		} finally {
@@ -206,6 +210,8 @@ export function useAgentEditor({
 	const managing = !!initial || !!current;
 	return {
 		dialog,
+		pendingNavigation,
+		setPendingNavigation,
 		current,
 		form,
 		system,

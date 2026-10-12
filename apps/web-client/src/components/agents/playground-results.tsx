@@ -1,5 +1,6 @@
 'use client';
 import type { useAgentPlayground } from './use-agent-playground';
+import { ReadableText } from '@/components/content/readable-text';
 import { Check, Copy } from 'lucide-react';
 import { ExecutionEvaluation } from './execution-evaluation';
 import { ExecutionTrace } from './execution-trace';
@@ -120,8 +121,8 @@ export function PlaygroundResults({
 					)}
 					<span
 						role='status'
-						className={`execution-status status-${run.status}`}>
-						{run.status}
+						className={`execution-status status-${run.status === 'completed' ? 'Finished' : run.status === 'cancelled' ? 'Stopped' : run.status === 'queued' ? 'Waiting' : run.status === 'running' ? 'Running' : run.status === 'interrupted' ? 'Interrupted' : 'Failed'}`}>
+						{run.status === 'completed' ? 'Finished' : run.status === 'cancelled' ? 'Stopped' : run.status === 'queued' ? 'Waiting' : run.status === 'running' ? 'Running' : run.status === 'interrupted' ? 'Interrupted' : 'Failed'}
 					</span>
 					{pending && canRun && (
 						<button
@@ -139,10 +140,10 @@ export function PlaygroundResults({
 				<div
 					className='execution-answer'
 					id={`execution-answer-${run.id}`}>
-					<p>{run.final_answer}</p>
+					<ReadableText text={run.final_answer} />
 				</div>
 			) : pending ? (
-				<div className='playground-working'>
+				<div className='playground-working' role='status'>
 					<span
 						className='playground-progress'
 						aria-hidden='true'
@@ -184,6 +185,7 @@ export function PlaygroundResults({
 					)}
 				</div>
 			)}
+			{!pending && <p className='execution-quality-note'>Execution status describes whether the run finished. Evaluation assesses the quality of its answer and tool use.</p>}
 			{!pending && (
 				<ExecutionEvaluation
 					key={run.id}
@@ -214,7 +216,7 @@ export function PlaygroundResults({
 					<ExecutionTrace
 						key={run.id}
 						path={`${base}/executions/${run.id}`}
-						version={`${run.status}:${run.model_turns}:${run.tool_calls}`}
+						version={`${run.status === 'completed' ? 'Finished' : run.status === 'cancelled' ? 'Stopped' : run.status === 'queued' ? 'Waiting' : run.status === 'running' ? 'Running' : run.status === 'interrupted' ? 'Interrupted' : 'Failed'}:${run.model_turns}:${run.tool_calls}`}
 					/>
 				)}
 			</details>

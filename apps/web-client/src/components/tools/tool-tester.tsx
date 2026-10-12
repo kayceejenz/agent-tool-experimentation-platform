@@ -48,7 +48,7 @@ export function ToolTester({
 			aria-labelledby='tool-title'
 			onCancel={e => {
 				e.preventDefault();
-				if(!busy) onClose();
+				if (!busy) onClose();
 			}}>
 			<header className='mcp-sheet-header'>
 				<div>
@@ -106,8 +106,12 @@ export function ToolTester({
 									'json'
 								}
 								disabled={busy}
-								onClick={() => setMode('json')}>
-								JSON
+								onClick={() =>
+									setMode(
+										'json',
+									)
+								}>
+								Advanced JSON
 							</button>
 						</div>
 					</div>
@@ -126,10 +130,24 @@ export function ToolTester({
 											.value,
 									)
 								}
-								spellCheck={false}
+								aria-invalid={
+									!valid ||
+									undefined
+								}
+								aria-describedby={
+									!valid
+										? 'tool-json-error'
+										: undefined
+								}
+								spellCheck={
+									false
+								}
 							/>
 							{!valid && (
-								<span className='mcp-error'>
+								<span
+									id='tool-json-error'
+									className='mcp-error'
+									role='status'>
 									Enter a
 									valid
 									JSON
@@ -141,24 +159,39 @@ export function ToolTester({
 						<div className='tool-inputs'>
 							{Object.entries(
 								schema.properties ??
-								{},
+									{},
 							).map(
 								([
 									name,
 									field,
 								]) => (
 									<InputField
-										key={name}
-										name={name}
-										schema={field}
+										key={
+											name
+										}
+										name={
+											name
+										}
+										schema={
+											field
+										}
+										schemaRoot={
+											schema
+										}
 										required={
 											schema.required?.includes(
 												name,
 											) ??
 											false
 										}
-										value={inputs[name]}
-										disabled={busy}
+										value={
+											inputs[
+												name
+											]
+										}
+										disabled={
+											busy
+										}
 										onInvalid={invalid =>
 											setInvalidFields(
 												old => ({
@@ -167,31 +200,40 @@ export function ToolTester({
 												}),
 											)
 										}
-										onChange={value => update(name, value)}
+										onChange={value =>
+											update(
+												name,
+												value,
+											)
+										}
 									/>
 								),
 							)}
 							{!Object.keys(
 								schema.properties ??
-								{},
+									{},
 							).length && (
-									<p>
-										This
-										tool has
-										no form
-										fields.
-										Use JSON
-										for
-										additional
-										inputs.
-									</p>
-								)}
+								<p>
+									This
+									tool has
+									no form
+									fields.
+									Use JSON
+									for
+									additional
+									inputs.
+								</p>
+							)}
 						</div>
 					)}
 					<details className='tool-schema'>
 						<summary>Input schema</summary>
 						<pre>
-							{JSON.stringify(schema, null, 2)}
+							{JSON.stringify(
+								schema,
+								null,
+								2,
+							)}
 						</pre>
 					</details>
 					{!canManage ? (
@@ -201,8 +243,8 @@ export function ToolTester({
 							cannot run tools.
 						</p>
 					) : !tool.available ||
-						!tool.enabled ||
-						!tool.server_enabled ? (
+					  !tool.enabled ||
+					  !tool.server_enabled ? (
 						<p className='mcp-note'>
 							Enable this tool and its
 							MCP server before
@@ -215,8 +257,12 @@ export function ToolTester({
 							<label className='tool-confirm'>
 								<input
 									type='checkbox'
-									checked={acknowledged}
-									disabled={busy}
+									checked={
+										acknowledged
+									}
+									disabled={
+										busy
+									}
 									onChange={e =>
 										setAcknowledged(
 											e
@@ -247,7 +293,9 @@ export function ToolTester({
 											Boolean,
 										))
 								}
-								onClick={() => void run()}>
+								onClick={() =>
+									void run()
+								}>
 								{busy
 									? 'Running…'
 									: 'Run tool'}
@@ -275,7 +323,9 @@ export function ToolTester({
 										recovering ||
 										busy
 									}
-									onClick={() => void reconcile()}>
+									onClick={() =>
+										void reconcile()
+									}>
 									Recheck
 									saved
 									operation
@@ -287,7 +337,9 @@ export function ToolTester({
 									recovering ||
 									busy
 								}
-								onClick={acknowledgeOutcome}>
+								onClick={
+									acknowledgeOutcome
+								}>
 								I checked the
 								outcome; allow a
 								new test
@@ -307,7 +359,9 @@ export function ToolTester({
 						<button
 							className='button'
 							disabled={busy}
-							onClick={() => void refreshHistory()}>
+							onClick={() =>
+								void refreshHistory()
+							}>
 							Refresh history
 						</button>
 					</div>
@@ -322,17 +376,28 @@ export function ToolTester({
 						history.map(execution => (
 							<details
 								className='tool-history'
-								key={execution.id}>
+								key={
+									execution.id
+								}>
 								<summary>
-									{new Date(execution.created_at).toLocaleString()}{' '}
+									{new Date(
+										execution.created_at,
+									).toLocaleString()}{' '}
 									·{' '}
-									{execution.status.replaceAll('_', ' ')}{' '}
+									{execution.status.replaceAll(
+										'_',
+										' ',
+									)}{' '}
 									·
 									revision{' '}
-									{execution.revision}
+									{
+										execution.revision
+									}
 								</summary>
 								<Execution
-									execution={execution}
+									execution={
+										execution
+									}
 								/>
 							</details>
 						))

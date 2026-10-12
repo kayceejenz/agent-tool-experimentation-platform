@@ -41,3 +41,5 @@ import '../mcp-servers.css';
 import '../tools.css';
 import '../prompts.css';
 import '../agents.css';
+
+import '../ux.css';

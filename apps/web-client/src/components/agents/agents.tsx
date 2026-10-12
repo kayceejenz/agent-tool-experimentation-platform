@@ -1,31 +1,17 @@
 'use client';
-import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ProjectSync } from '@/components/projects/project-provider';
 import { projectRequest } from '@/lib/projects/client';
 import type { Project } from '@/types/workspace';
 import type { AgentPage, AgentSummary } from '@/types/agent';
 
-const AgentEditor = dynamic(
-	() => import('./agent-editor').then(module => module.AgentEditor),
-	{ loading: () => <p role='status'>Loading dialog…</p> },
-);
-
-const AgentPlayground = dynamic(
-	() =>
-		import('./agent-playground').then(
-			module => module.AgentPlayground,
-		),
-	{ loading: () => <p role='status'>Loading dialog…</p> },
-);
-
 export function Agents({ project }: { project: Project }) {
-	const [selection, setSelection] = useState<AgentSummary | 'new' | null>(
-			null,
-		),
-		[generation, setGeneration] = useState(0);
-	const opener = useRef<HTMLElement | null>(null);
-	const [playground, setPlayground] = useState<AgentSummary | null>(null);
+	const router = useRouter();
+	const [generation, setGeneration] = useState(0);
+	const base = `/projects/${project.id}/agents`;
+
 	return (
 		<>
 			<ProjectSync project={project} />
@@ -33,29 +19,23 @@ export function Agents({ project }: { project: Project }) {
 				<div>
 					<h1>Agents</h1>
 					<p>
-						Configure versioned agents with
-						prompts, models and selected
-						tools.
+						Choose an agent to run a task or
+						edit its configuration.
 					</p>
 				</div>
 				{project.role !== 'viewer' && (
-					<button
+					<Link
 						className='button primary'
-						onClick={e => {
-							opener.current =
-								e.currentTarget;
-							setSelection('new');
-						}}>
+						href={`${base}/new`}>
 						Create agent
-					</button>
+					</Link>
 				)}
 			</header>
-			<section className='panel'>
+			<section className='panel' aria-label='Agent list'>
 				<div className='prompt-toolbar'>
 					<p className='mcp-meta'>
-						Run configured agents and
-						inspect their model turns and
-						tool calls.
+						Configurations are versioned so
+						every run can be traced.
 					</p>
 					<button
 						className='button'
@@ -70,56 +50,18 @@ export function Agents({ project }: { project: Project }) {
 				<AgentList
 					key={generation}
 					projectId={project.id}
-					onPlayground={(agent, button) => {
-						opener.current = button;
-						setPlayground(agent);
-					}}
-					onSelect={(agent, button) => {
-						opener.current = button;
-						setSelection(agent);
-					}}
+					onSelect={agent =>
+						router.push(
+							`${base}/${agent.id}`,
+						)
+					}
+					onPlayground={agent =>
+						router.push(
+							`${base}/${agent.id}/playground`,
+						)
+					}
 				/>
 			</section>
-			{playground && (
-				<AgentPlayground
-					projectId={project.id}
-					agent={playground}
-					canRun={project.role !== 'viewer'}
-					onClose={() => {
-						setPlayground(null);
-						requestAnimationFrame(() =>
-							opener.current?.focus(),
-						);
-					}}
-				/>
-			)}
-			{selection && (
-				<AgentEditor
-					projectId={project.id}
-					initial={
-						selection === 'new'
-							? null
-							: selection
-					}
-					canEdit={project.role !== 'viewer'}
-					onSaved={() =>
-						setGeneration(n => n + 1)
-					}
-					onClose={() => {
-						setSelection(null);
-						requestAnimationFrame(() =>
-							opener.current
-								?.isConnected
-								? opener.current.focus()
-								: document
-										.querySelector<HTMLButtonElement>(
-											'.prompt-toolbar button',
-										)
-										?.focus(),
-						);
-					}}
-				/>
-			)}
 		</>
 	);
 }
@@ -210,22 +152,22 @@ function AgentList({
 						<table className='tool-table'>
 							<thead>
 								<tr>
-									<th>
+									<th scope='col'>
 										Name
 									</th>
-									<th>
+									<th scope='col'>
 										Model
 									</th>
-									<th>
+									<th scope='col'>
 										Revision
 									</th>
-									<th>
+									<th scope='col'>
 										Tools
 									</th>
-									<th>
+									<th scope='col'>
 										Availability
 									</th>
-									<th>
+									<th scope='col'>
 										Action
 									</th>
 								</tr>
@@ -237,7 +179,7 @@ function AgentList({
 											key={
 												agent.id
 											}>
-											<td>
+											<td data-label="Name">
 												<strong>
 													{
 														agent.name
@@ -248,7 +190,7 @@ function AgentList({
 														'No description'}
 												</p>
 											</td>
-											<td>
+											<td data-label="Model">
 												{agent
 													.model_settings
 													.model ||
@@ -261,23 +203,23 @@ function AgentList({
 													}
 												</small>
 											</td>
-											<td>
+											<td data-label="Revision">
 												v
 												{
 													agent.revision
 												}
 											</td>
-											<td>
+											<td data-label="Tools">
 												{
 													agent.tool_count
 												}
 											</td>
-											<td>
+											<td data-label="Availability">
 												{agent.enabled
 													? 'Enabled'
 													: 'Disabled'}
 											</td>
-											<td>
+											<td data-label="Action">
 												<button
 													className='button'
 													aria-label={`Manage ${agent.name}`}

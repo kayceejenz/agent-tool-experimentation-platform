@@ -15,11 +15,13 @@ import { projectWrite } from '@/lib/projects/client';
 export function useAgentPlayground({
 	projectId,
 	agent,
+	pageMode = false,
 }: {
 	projectId: string;
 	agent: AgentSummary;
+	pageMode?: boolean;
 }) {
-	const dialog = useModalDialog();
+	const dialog = useModalDialog(!pageMode);
 	const [input, setInput] = useState(''),
 		[error, setError] = useState(''),
 		[busy, setBusy] = useState(false);
@@ -35,6 +37,15 @@ export function useAgentPlayground({
 	const taskInput = useRef<HTMLTextAreaElement>(null);
 	const base = `/${projectId}`;
 	const pending = run?.status === 'queued' || run?.status === 'running';
+ useEffect(() => {
+  if (!pageMode) return;
+  const id = new URL(window.location.href).searchParams.get('execution');
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return;
+  let active = true;
+  const controller = new AbortController();
+  void projectRequest<ExecutionOverview>(`${base}/executions/${id}?view=summary`, { signal: controller.signal }).then(value => { if (active) setRun(value); }).catch(reason => { if (active) setError(reason.message); });
+  return () => { active = false; controller.abort(); };
+ }, [base, pageMode]);
 	useEffect(() => {
 		taskInput.current?.focus();
 	}, []);
@@ -83,6 +94,12 @@ export function useAgentPlayground({
 		updateStatus,
 		finished,
 	);
+ function selectExecutionUrl(id: string | null) {
+  if (!pageMode) return;
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('execution', id); else url.searchParams.delete('execution');
+  window.history.replaceState(window.history.state, '', url.pathname + url.search);
+ }
 	async function inspect(id: string) {
 		setBusy(true);
 		setError('');
@@ -92,6 +109,7 @@ export function useAgentPlayground({
 					`${base}/executions/${id}?view=summary`,
 				),
 			);
+			selectExecutionUrl(id);
 			setView('run');
 			setShowDetails(false);
 			setExpandedTask(false);
@@ -195,6 +213,7 @@ export function useAgentPlayground({
 		}
 	}
 	function newTask() {
+		selectExecutionUrl(null);
 		setView('run');
 		setRun(null);
 		setInput('');
@@ -214,6 +233,7 @@ export function useAgentPlayground({
 	}
 	function editTask() {
 		if (!run || pending || busy) return;
+		selectExecutionUrl(null);
 		setInput(run.input);
 		setRun(null);
 		setRequestId(null);

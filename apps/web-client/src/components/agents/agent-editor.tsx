@@ -1,4 +1,7 @@
 'use client';
+import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { type AgentSummary } from '@/types/agent';
 import { AgentHistory } from './agent-history';
 import {
@@ -20,15 +23,19 @@ export function AgentEditor({
 	canEdit,
 	onClose,
 	onSaved,
+	pageMode = false,
 }: {
 	projectId: string;
 	initial: AgentSummary | null;
 	canEdit: boolean;
 	onClose: () => void;
-	onSaved: () => void;
+	onSaved: (agent: import('@/types/agent').Agent) => void;
+	pageMode?: boolean;
 }) {
 	const {
 		dialog,
+		pendingNavigation,
+		setPendingNavigation,
 		current,
 		form,
 		system,
@@ -59,16 +66,26 @@ export function AgentEditor({
 		toggle,
 		field,
 		managing,
-	} = useAgentEditor({ projectId, initial, canEdit, onClose, onSaved });
-	return (
-		<dialog
-			ref={dialog}
-			className={`mcp-sheet agent-sheet${managing ? '' : ' agent-create-dialog'}`}
-			aria-labelledby='agent-title'
-			onCancel={event => {
-				event.preventDefault();
-				close();
-			}}>
+	} = useAgentEditor({
+		projectId,
+		initial,
+		canEdit,
+		onClose,
+		onSaved,
+		pageMode,
+	});
+	const router = useRouter();
+	const sectionHeading = useRef<HTMLHeadingElement>(null);
+	const previousSection = useRef(`${tab}:${step}`);
+	useEffect(() => {
+		const next = `${tab}:${step}`;
+		if (previousSection.current !== next) {
+			sectionHeading.current?.focus();
+			previousSection.current = next;
+		}
+	}, [tab, step]);
+	const content = (
+		<>
 			<header className='mcp-sheet-header'>
 				<div>
 					<p className='eyebrow'>
@@ -87,16 +104,25 @@ export function AgentEditor({
 					className='button'
 					disabled={busy || pickerBusy}
 					onClick={close}>
-					Close
+					{pageMode ? 'Back to agents' : 'Close'}
 				</button>
 			</header>
 			<div className='mcp-sheet-body'>
 				{discard && (
 					<UnsavedChanges
-						onKeepEditing={() =>
-							setDiscard(false)
-						}
-						onDiscard={onClose}
+						onKeepEditing={() => {
+							setDiscard(false);
+							setPendingNavigation(
+								null,
+							);
+						}}
+						onDiscard={() => {
+							if (pendingNavigation)
+								router.push(
+									pendingNavigation,
+								);
+							else onClose();
+						}}
 					/>
 				)}
 				{error && (
@@ -176,6 +202,12 @@ export function AgentEditor({
 							))}
 					</div>
 				)}
+				<h3
+					ref={sectionHeading}
+					tabIndex={-1}
+					className='configuration-section-title'>
+					{managing ? tab : wizardSteps[step]}
+				</h3>
 				{!canEdit && (
 					<p className='mcp-note'>
 						You have read-only access.
@@ -261,39 +293,170 @@ export function AgentEditor({
 								}
 							/>
 						)}
+						{!managing && step === 4 && (
+							<section
+								className='configuration-review'
+								aria-label='Configuration summary'>
+								<h4>
+									Review
+									your
+									agent
+								</h4>
+								<dl>
+									<div>
+										<dt>
+											Name
+										</dt>
+										<dd>
+											{form.name ||
+												'Not set'}
+										</dd>
+									</div>
+									<div>
+										<dt>
+											Model
+										</dt>
+										<dd>
+											{form
+												.model_settings
+												.model ||
+												'Choose a model before running'}
+										</dd>
+									</div>
+									<div>
+										<dt>
+											Instructions
+										</dt>
+										<dd>
+											{system?.name ??
+												'No system prompt'}{' '}
+											·{' '}
+											{agentPrompt?.name ??
+												'No agent prompt'}
+										</dd>
+									</div>
+									<div>
+										<dt>
+											Tools
+										</dt>
+										<dd>
+											{
+												tools.length
+											}{' '}
+											selected
+										</dd>
+									</div>
+									<div>
+										<dt>
+											Evaluation
+										</dt>
+										<dd>
+											{form
+												.evaluation_profile
+												.enabled
+												? 'Automatic'
+												: 'Manual'}
+										</dd>
+									</div>
+								</dl>
+								<p>
+									You can
+									save a
+									draft.
+									Complete
+									the
+									configuration
+									and
+									enable
+									the
+									agent
+									before
+									running
+									a task.
+								</p>
+							</section>
+						)}
 						{(managing
 							? tab === 'Limits'
 							: step === 4) && (
-							<AgentLimitsFields
-								form={form}
-								disabled={
-									disabled
-								}
-								field={field}
-							/>
+							<details
+								className='advanced-settings'
+								open={
+									managing ||
+									undefined
+								}>
+								<summary>
+									Advanced
+									execution
+									settings{' '}
+									<span>
+										{
+											form
+												.limits
+												.max_turns
+										}{' '}
+										turns
+										·{' '}
+										{
+											form
+												.limits
+												.timeout_seconds
+										}
+
+										s
+										timeout
+									</span>
+								</summary>
+								<AgentLimitsFields
+									form={
+										form
+									}
+									disabled={
+										disabled
+									}
+									field={
+										field
+									}
+								/>
+							</details>
 						)}
 						{(managing
 							? tab === 'Evaluation'
-							: step === 5) && (
-							<AgentEvaluationFields
-								form={form}
-								field={field}
-								evaluationPrompt={
-									evaluationPrompt
-								}
-								setEvaluationPrompt={
-									setEvaluationPrompt
-								}
-								setPickerBusy={
-									setPickerBusy
-								}
-								disabled={
-									disabled
-								}
-								projectId={
-									projectId
-								}
-							/>
+							: step === 4) && (
+							<details
+								className='advanced-settings'
+								open={
+									managing ||
+									undefined
+								}>
+								<summary>
+									Evaluation
+									settings
+								</summary>
+								<AgentEvaluationFields
+									form={
+										form
+									}
+									field={
+										field
+									}
+									evaluationPrompt={
+										evaluationPrompt
+									}
+									setEvaluationPrompt={
+										setEvaluationPrompt
+									}
+									setPickerBusy={
+										setPickerBusy
+									}
+									disabled={
+										disabled
+									}
+									projectId={
+										projectId
+									}
+								/>
+							</details>
 						)}
 						{canEdit && (
 							<footer className='agent-save'>
@@ -397,7 +560,73 @@ export function AgentEditor({
 						)}
 					</form>
 				)}
+				{current && pageMode && (
+					<div className='agent-next-actions'>
+						{dirty ? (
+							<p>
+								Save your
+								changes before
+								running this
+								configuration.
+							</p>
+						) : current.enabled ? (
+							<Link
+								className='button primary'
+								href={`/projects/${projectId}/agents/${current.id}/playground`}>
+								Open playground
+							</Link>
+						) : canEdit &&
+						  current.configuration_ready ? (
+							<button
+								type='button'
+								className='button primary'
+								disabled={
+									disabled
+								}
+								onClick={async () => {
+									const saved =
+										await toggle();
+									if (
+										saved?.enabled
+									)
+										router.push(
+											`/projects/${projectId}/agents/${saved.id}/playground`,
+										);
+								}}>
+								Enable and open
+								playground
+							</button>
+						) : (
+							<p>
+								Complete the
+								configuration to
+								enable this
+								agent.
+							</p>
+						)}
+					</div>
+				)}
 			</div>
+		</>
+	);
+	if (pageMode)
+		return (
+			<section
+				className='agent-page-panel'
+				aria-label='Agent configuration'>
+				{content}
+			</section>
+		);
+	return (
+		<dialog
+			ref={dialog}
+			className={`mcp-sheet agent-sheet${managing ? '' : ' agent-create-dialog'}`}
+			aria-labelledby='agent-title'
+			onCancel={event => {
+				event.preventDefault();
+				close();
+			}}>
+			{content}
 		</dialog>
 	);
 }

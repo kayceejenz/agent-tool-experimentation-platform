@@ -12,11 +12,13 @@ export function AgentPlayground({
 	agent,
 	canRun,
 	onClose,
+	pageMode = false,
 }: {
 	projectId: string;
 	agent: AgentSummary;
 	canRun: boolean;
 	onClose: () => void;
+	pageMode?: boolean;
 }) {
 	const {
 		updateInput,
@@ -47,16 +49,9 @@ export function AgentPlayground({
 		failureHint,
 		copyAnswer,
 		newTask,
-	} = useAgentPlayground({ projectId, agent });
-	return (
-		<dialog
-			ref={dialog}
-			className={styles.root}
-			aria-labelledby='playground-title'
-			onCancel={e => {
-				e.preventDefault();
-				onClose();
-			}}>
+	} = useAgentPlayground({ projectId, agent, pageMode });
+	const content = (
+		<>
 			<header className='playground-header'>
 				<div className='playground-heading'>
 					<p className='eyebrow'>Playground</p>
@@ -106,9 +101,20 @@ export function AgentPlayground({
 				</div>
 				<button
 					className='playground-close'
-					aria-label='Close'
+					aria-label={
+						pageMode
+							? 'Back to agents'
+							: 'Close playground'
+					}
 					onClick={onClose}>
-					<X size={20} aria-hidden='true' />
+					{pageMode ? (
+						'Back to agents'
+					) : (
+						<X
+							size={20}
+							aria-hidden='true'
+						/>
+					)}
 				</button>
 			</header>
 			<div className='playground-body'>
@@ -140,6 +146,7 @@ export function AgentPlayground({
 					/>
 				) : !run ? (
 					<PlaygroundComposer
+						projectId={projectId}
 						input={input}
 						busy={busy}
 						taskInput={taskInput}
@@ -169,6 +176,26 @@ export function AgentPlayground({
 					/>
 				)}
 			</div>
+		</>
+	);
+	if (pageMode)
+		return (
+			<section
+				className={`${styles.root} ${styles.page}`}
+				aria-label='Agent playground'>
+				{content}
+			</section>
+		);
+	return (
+		<dialog
+			ref={dialog}
+			className={styles.root}
+			aria-labelledby='playground-title'
+			onCancel={e => {
+				e.preventDefault();
+				onClose();
+			}}>
+			{content}
 		</dialog>
 	);
 }

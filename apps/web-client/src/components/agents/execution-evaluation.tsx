@@ -61,9 +61,9 @@ const labels: Record<string, string> = {
 	efficiency: 'Efficiency',
 	write_handling: 'Write handling',
 	pass: 'Passed',
-	partial: 'Partial',
-	fail: 'Failed',
-	unknown: 'Unknown',
+	partial: 'Needs improvement',
+	fail: 'Needs improvement',
+	unknown: 'Inconclusive',
 	not_applicable: 'Not applicable',
 	completed: 'Completed',
 	blocked: 'Blocked',
@@ -205,44 +205,15 @@ export function ExecutionEvaluation({
 		report?.checks.filter(check =>
 			['fail', 'partial'].includes(check.status ?? ''),
 		) ?? [];
-	return (
-		<details className='playground-details evaluation-panel'>
-			<summary>
-				<ClipboardCheck size={16} aria-hidden='true' />
-				Evaluation
-				<span className='evaluation-summary-status'>
-					{report && (
-						<small>
-							{report
-								.critical_failures
-								.length
-								? `${report.critical_failures.length} critical ${report.critical_failures.length === 1 ? 'issue' : 'issues'}`
-								: issues.length
-									? `${issues.length} ${issues.length === 1 ? 'check needs' : 'checks need'} attention`
-									: report.overall_verdict ===
-										  'pass'
-										? 'All checks passed'
-										: 'Review findings'}
-						</small>
-					)}
-					{evaluation ? (
-						<VerdictBadge
-							value={
-								report?.overall_verdict ??
-								evaluation.status
-							}
-						/>
-					) : (
-						<small>
-							{error
-								? 'Unavailable'
-								: page
-									? 'No evaluation yet'
-									: 'Loading…'}
-						</small>
-					)}
-				</span>
-			</summary>
+ const mainIssue = report?.critical_failures[0] ?? issues[0];
+ return (<>
+  <section className='evaluation-outcome-summary' aria-label='Evaluation summary' aria-live='polite'>
+   <div><h3>Evaluation</h3>{report ? <VerdictBadge value={report.overall_verdict} /> : <span>{error ? 'Unavailable' : !page ? 'Loading…' : evaluation?.status === 'failed' ? 'Evaluation failed' : pending ? 'Evaluating…' : 'Not evaluated'}</span>}</div>
+   <p>{mainIssue?.reason ?? (report ? report.overall_verdict === 'pass' ? 'The recorded checks passed. Open the details to review the supporting evidence.' : 'Review the findings and limitations before relying on this result.' : pending ? 'Your answer is saved. Evaluation is running separately.' : 'Open evaluation details to run an assessment or review its status.')}</p>
+   {evaluation?.metrics && <p className='mcp-meta'>{evaluation.metrics.tool_calls} tool calls · {evaluation.metrics.model_turns} model turns{evaluation.metrics.elapsed_ms != null ? ` · ${(evaluation.metrics.elapsed_ms / 1000).toFixed(1)}s` : ''}</p>}
+  </section>
+  <details className='playground-details evaluation-panel'>
+			<summary><ClipboardCheck size={16} aria-hidden='true' /> Evaluation details</summary>
 			<div className='playground-detail-content'>
 				<div className='evaluation-toolbar'>
 					<p>
@@ -859,7 +830,7 @@ export function ExecutionEvaluation({
 				)}
 			</div>
 		</details>
-	);
+	</>);
 }
 
 function FindingDetails({

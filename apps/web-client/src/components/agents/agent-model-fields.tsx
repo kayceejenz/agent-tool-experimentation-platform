@@ -26,35 +26,46 @@ export function AgentModelFields({
 					})
 				}
 			/>
-			<label className='tool-field'>
-				Temperature (optional)
-				<input
-					type='number'
-					min={0}
-					max={2}
-					step='0.1'
-					value={settings.temperature ?? ''}
-					disabled={disabled}
-					onChange={e =>
-						field('model_settings', {
-							...settings,
-							temperature:
-								e.target
-									.value ===
-								''
-									? null
-									: Number(
-											e
-												.target
-												.value,
-										),
-						})
-					}
-				/>
-				<small>
-					Leave blank for the model default.
-				</small>
-			</label>
+			<details className='advanced-settings'>
+				<summary>Advanced model settings</summary>
+				<label className='tool-field'>
+					Temperature (optional)
+					<input
+						type='number'
+						min={0}
+						max={2}
+						step='0.1'
+						value={
+							settings.temperature ??
+							''
+						}
+						disabled={disabled}
+						onChange={e =>
+							field(
+								'model_settings',
+								{
+									...settings,
+									temperature:
+										e
+											.target
+											.value ===
+										''
+											? null
+											: Number(
+													e
+														.target
+														.value,
+												),
+								},
+							)
+						}
+					/>
+					<small>
+						Leave blank for the model
+						default.
+					</small>
+				</label>
+			</details>
 		</>
 	);
 }
