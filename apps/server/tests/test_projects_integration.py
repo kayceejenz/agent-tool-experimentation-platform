@@ -234,3 +234,83 @@ def test_runtime_grants_allow_project_operations_without_creator_changes(workspa
             )[0][0]
             is expected
         )
+
+
+def test_usage_aggregates_project_records_without_double_counting(workspace):
+    from psycopg.types.json import Jsonb
+
+    client, config, users = workspace
+    project = create(client, users[0][1], "Usage")
+    other = create(client, users[0][1], "Other")
+    path = f"/api/v1/projects/{project['id']}/usage"
+    assert client.get(path, headers=users[1][1]).status_code == 404
+    assert client.get(path).status_code == 401
+    empty = client.get(path, headers=users[0][1])
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["totals"]["total_tokens"] == 0
+    for target in (project, other):
+        agent, execution = uuid4(), uuid4()
+        query(
+            config,
+            "INSERT INTO agent_platform.agents(id,project_id) VALUES (%s,%s)",
+            (agent, target["id"]),
+        )
+        query(
+            config,
+            "INSERT INTO agent_platform.agent_revisions(agent_id,revision,name,description,model_settings,limits,created_by) VALUES (%s,1,'Test','',%s,'{}',%s)",
+            (agent, Jsonb({"provider": "openai", "model": "gpt-4o-mini"}), users[0][0]),
+        )
+        query(
+            config,
+            "INSERT INTO agent_platform.agent_executions(id,project_id,agent_id,agent_revision,user_id,request_id,input,input_hash,snapshot,status) VALUES (%s,%s,%s,1,%s,%s,'Synthetic','hash',%s,'failed')",
+            (
+                execution,
+                target["id"],
+                agent,
+                users[0][0],
+                uuid4(),
+                Jsonb(
+                    {"model_settings": {"provider": "openai", "model": "gpt-4o-mini"}}
+                ),
+            ),
+        )
+        # Two model turns, one tool span, and one missing-usage turn.
+        for sequence, kind, outputs, finished in [
+            (1, "model", [{"usage": {"input_count": 1000, "output_count": 100}}], True),
+            (2, "model", [{"usage": {"input_count": 2000, "output_count": 200}}], True),
+            (3, "tool", [], True),
+            (4, "model", None, True),
+            (5, "model", None, False),
+        ]:
+            query(
+                config,
+                "INSERT INTO agent_platform.execution_spans(id,execution_id,sequence,kind,name,inputs,outputs,finished_at) VALUES (%s,%s,%s,%s,'Test','{}',%s,CASE WHEN %s THEN now() END)",
+                (uuid4(), execution, sequence, kind, Jsonb(outputs), finished),
+            )
+        # Each re-evaluation consumes additional tokens; include a failed judge response.
+        for attempt in (1, 2):
+            query(
+                config,
+                "INSERT INTO agent_platform.execution_evaluations(execution_id,attempt,requested_by,profile,status,usage,started_at,finished_at) VALUES (%s,%s,%s,%s,%s,%s,now(),now())",
+                (
+                    execution,
+                    attempt,
+                    users[0][0],
+                    Jsonb({"provider": "google", "model": "gemini-2.5-flash"}),
+                    "completed" if attempt == 1 else "failed",
+                    Jsonb({"input_count": 1000, "output_count": 100}),
+                ),
+            )
+    result = client.get(path, headers=users[0][1])
+    assert result.status_code == 200, result.text
+    value = result.json()
+    assert value["totals"]["input_tokens"] == 5000
+    assert value["totals"]["output_tokens"] == 500
+    assert value["totals"]["calls"] == 5
+    assert value["totals"]["missing_usage_calls"] == 1
+    assert value["totals"]["unpriced_calls"] == 0
+    assert float(value["totals"]["estimated_cost_usd"]) == pytest.approx(0.00173)
+    assert value["sources"]["agent"]["total_tokens"] == 3300
+    assert value["sources"]["evaluation"]["total_tokens"] == 2200
+    assert sum(day["total_tokens"] for day in value["daily"]) == 5500
+    assert result.headers["cache-control"] == "no-store"

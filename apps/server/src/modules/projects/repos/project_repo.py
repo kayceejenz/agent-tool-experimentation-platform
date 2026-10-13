@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from integrations.database import Database
 from psycopg import sql
@@ -93,3 +94,61 @@ class ProjectRepository:
                 if row is None:
                     raise ProjectNotFoundError
                 return Project(**row, role=member["role"])
+
+    async def usage(self, user_id: UUID, project_id: UUID):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                # Authorize in the same transaction; no execution content leaves SQL.
+                member = await (
+                    await db.execute(
+                        "SELECT role FROM agent_platform.project_members WHERE project_id=%s AND user_id=%s FOR SHARE",
+                        (project_id, user_id),
+                    )
+                ).fetchone()
+                if member is None:
+                    raise ProjectNotFoundError
+                return await (
+                    await db.execute(
+                        """
+                    WITH records AS (
+                        SELECT 'agent' AS source,
+                            e.snapshot->'model_settings'->>'provider' AS provider,
+                            e.snapshot->'model_settings'->>'model' AS model,
+                            s.finished_at AS recorded_at,
+                            u.input_tokens, u.output_tokens, u.missing
+                        FROM agent_platform.agent_executions e
+                        JOIN agent_platform.execution_spans s ON s.execution_id=e.id
+                        CROSS JOIN LATERAL (
+                            SELECT COALESCE(sum((m->'usage'->>'input_count')::bigint),0) AS input_tokens,
+                                COALESCE(sum((m->'usage'->>'output_count')::bigint),0) AS output_tokens,
+                                count(*)=0 OR bool_or(m->'usage'->>'input_count' IS NULL OR m->'usage'->>'output_count' IS NULL) AS missing
+                            FROM jsonb_array_elements(CASE WHEN jsonb_typeof(s.outputs)='array' THEN s.outputs ELSE '[]'::jsonb END) m
+                        ) u
+                        WHERE e.project_id=%s AND s.kind='model' AND s.finished_at IS NOT NULL
+                        UNION ALL
+                        SELECT 'evaluation', j.profile->>'provider', j.profile->>'model', j.finished_at,
+                            COALESCE((j.usage->>'input_count')::bigint,0),
+                            COALESCE((j.usage->>'output_count')::bigint,0),
+                            j.usage->>'input_count' IS NULL OR j.usage->>'output_count' IS NULL
+                        FROM agent_platform.execution_evaluations j
+                        JOIN agent_platform.agent_executions e ON e.id=j.execution_id
+                        WHERE e.project_id=%s AND j.finished_at IS NOT NULL AND j.started_at IS NOT NULL
+                    ), buckets AS (
+                        SELECT *, input_tokens>200000 AS long_context,
+                            CASE WHEN (recorded_at AT TIME ZONE 'Europe/London')::date >= %s
+                                THEN (recorded_at AT TIME ZONE 'Europe/London')::date END AS day
+                        FROM records
+                    )
+                    SELECT source, lower(provider) AS provider, model, long_context, day,
+                        sum(input_tokens) AS input_tokens, sum(output_tokens) AS output_tokens,
+                        count(*) AS calls, count(*) FILTER (WHERE missing) AS missing_usage_calls
+                    FROM buckets GROUP BY source, lower(provider), model, long_context, day
+                    """,
+                        (
+                            project_id,
+                            project_id,
+                            datetime.now(ZoneInfo("Europe/London")).date()
+                            - timedelta(days=13),
+                        ),
+                    )
+                ).fetchall()

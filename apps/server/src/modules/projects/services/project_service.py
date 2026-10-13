@@ -3,12 +3,14 @@ import binascii
 import json
 from datetime import datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from modules.projects.contracts.project_repository_contract import (
     ProjectRepositoryContract,
 )
 from modules.projects.dtos.create_project_dto import CreateProjectRequest
 from modules.projects.dtos.update_project_dto import UpdateProjectRequest
+from modules.projects.helpers.usage import usage_summary
 
 
 class ProjectService:
@@ -54,3 +56,7 @@ class ProjectService:
                 json.dumps([last.created_at.isoformat(), str(last.id)]).encode()
             ).decode()
         return {"items": items, "next_cursor": next_cursor}
+
+    async def usage(self, user_id: UUID, project_id: UUID):
+        rows = await self.repository.usage(user_id, project_id)
+        return usage_summary(rows, datetime.now(ZoneInfo("Europe/London")).date())

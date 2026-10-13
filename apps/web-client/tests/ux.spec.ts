@@ -14,6 +14,7 @@ test('overview reflects setup and dedicated agent pages survive reload without m
 	).json();
 	const base = `/api/projects/${project.id}`;
 	await page.goto(`/projects/${project.id}`);
+	await page.getByText('Project setup & activity', { exact: true }).click();
 	await expect(
 		page.getByRole('heading', { name: 'Your next step' }),
 	).toBeVisible();

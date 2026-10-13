@@ -10,6 +10,7 @@ from modules.projects.dtos.project_response_dto import (
     ProjectListResponse,
     ProjectResponse,
 )
+from modules.projects.dtos.project_usage_dto import ProjectUsageResponse
 from modules.projects.dtos.update_project_dto import UpdateProjectRequest
 from modules.projects.models.error_model import (
     ProjectForbiddenError,
@@ -55,3 +56,11 @@ async def update_project(
         raise HTTPException(404, "Project not found") from None
     except ProjectForbiddenError:
         raise HTTPException(403, "Project cannot be edited") from None
+
+
+@router.get("/{project_id}/usage", response_model=ProjectUsageResponse)
+async def get_project_usage(project_id: UUID, user: User, projects: Service):
+    try:
+        return await projects.usage(user.id, project_id)
+    except ProjectNotFoundError:
+        raise HTTPException(404, "Project not found") from None

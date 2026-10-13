@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { ProjectUsage } from './project-usage';
 import Link from 'next/link';
 import { projectRequest } from '@/lib/projects/client';
 import type { AgentPage } from '@/types/agent';
@@ -151,206 +152,224 @@ export function ProjectDashboard({ project }: { project: Project }) {
 	const next = steps.find(step => !step.done);
 	return (
 		<>
-			<section
-				className='panel dashboard-section'
-				aria-labelledby='project-next-step'>
-				<div className='dashboard-heading'>
-					<div>
-						<h2 id='project-next-step'>
-							{next
-								? 'Your next step'
-								: 'Your project is ready'}
-						</h2>
-						<p>
-							{next?.description ??
-								'Run a task and review how your agent used its tools.'}
-						</p>
+			<ProjectUsage projectId={project.id} />
+			<details className='project-activity'>
+				<summary>Project setup &amp; activity</summary>
+				<section
+					className='panel dashboard-section'
+					aria-labelledby='project-next-step'>
+					<div className='dashboard-heading'>
+						<div>
+							<h2 id='project-next-step'>
+								{next
+									? 'Your next step'
+									: 'Your project is ready'}
+							</h2>
+							<p>
+								{next?.description ??
+									'Run a task and review how your agent used its tools.'}
+							</p>
+						</div>
+						<Link
+							className='button primary'
+							href={
+								next?.href ??
+								(runnable
+									? `${base}/agents/${runnable.id}/playground`
+									: `${base}/agents`)
+							}>
+							{next?.title ??
+								'Run agent'}
+						</Link>
 					</div>
-					<Link
-						className='button primary'
-						href={
-							next?.href ??
-							(runnable
-								? `${base}/agents/${runnable.id}/playground`
-								: `${base}/agents`)
-						}>
-						{next?.title ?? 'Run agent'}
-					</Link>
-				</div>
-				<ol className='setup-checklist'>
-					{steps.map((step, index) => (
-						<li key={step.title}>
-							<span
-								className={
-									step.done
-										? 'setup-marker done'
-										: 'setup-marker'
-								}
-								aria-hidden='true'>
-								{step.done
-									? '✓'
-									: index +
-										1}
-							</span>
-							<div>
-								<Link
-									href={
-										step.href
-									}>
-									{
-										step.title
+					<ol className='setup-checklist'>
+						{steps.map((step, index) => (
+							<li key={step.title}>
+								<span
+									className={
+										step.done
+											? 'setup-marker done'
+											: 'setup-marker'
 									}
-								</Link>
-								<small>
+									aria-hidden='true'>
 									{step.done
-										? 'Complete'
-										: step.description}
-								</small>
-							</div>
-						</li>
-					))}
-				</ol>
-			</section>
-			<section
-				className='metric-grid dashboard-metrics'
-				aria-label='Project resources'>
-				{[
-					[
-						'Connections',
-						data.servers.items.length,
-						data.servers.next_cursor,
-						'servers',
-					],
-					[
-						'Tools',
-						data.tools.items.length,
-						data.tools.next_offset !== null,
-						'tools',
-					],
-					[
-						'Agents',
-						data.agents.items.length,
-						data.agents.next_offset !==
-							null,
-						'agents',
-					],
-				].map(([label, count, more, path]) => (
-					<Link
-						className='metric-card'
-						href={`${base}/${path}`}
-						key={String(label)}>
-						<span>{label}</span>
-						<strong>
-							{count}
-							{more ? '+' : ''}
-						</strong>
-						<small>
-							View{' '}
-							{String(
-								label,
-							).toLowerCase()}
-						</small>
-					</Link>
-				))}
-			</section>
-			<section
-				className='panel dashboard-section'
-				aria-labelledby='connection-health'>
-				<h2 id='connection-health'>
-					Connection health
-				</h2>
-				{data.servers.items.length ? (
-					<ul className='dashboard-list'>
-						{data.servers.items.map(
-							server => (
-								<li
-									key={
-										server.id
-									}>
-									<Link
-										href={`${base}/servers`}>
-										{
-											server.name
-										}
-									</Link>
-									<span
-										className={`execution-status status-${server.connection_status === 'connected' ? 'completed' : server.connection_status === 'error' ? 'failed' : 'queued'}`}>
-										{server.connection_status ===
-										'connected'
-											? 'Connected'
-											: server.connection_status ===
-												  'error'
-												? 'Needs attention'
-												: 'Not checked'}
-									</span>
-								</li>
-							),
-						)}
-					</ul>
-				) : (
-					<p>
-						No connections yet. Start by
-						adding an MCP server.
-					</p>
-				)}
-			</section>
-			<section
-				className='panel dashboard-section'
-				aria-labelledby='recent-runs'>
-				<h2 id='recent-runs'>Recent runs</h2>
-				<p className='mcp-meta'>
-					Latest activity from the first three
-					agents in your list.
-				</p>
-				{runsError ? (
-					<p role='status'>{runsError}</p>
-				) : runs.length ? (
-					<ul className='dashboard-list'>
-						{runs.map(run => (
-							<li key={run.id}>
+										? '✓'
+										: index +
+											1}
+								</span>
 								<div>
 									<Link
-										href={`${base}/agents/${run.agentId}/playground?execution=${run.id}`}>
-										{run.input.slice(
-											0,
-											120,
-										)}
+										href={
+											step.href
+										}>
+										{
+											step.title
+										}
 									</Link>
 									<small>
-										{
-											run.agentName
-										}{' '}
-										·{' '}
-										<time
-											dateTime={
-												run.created_at
-											}>
-											{new Date(
-												run.created_at,
-											).toLocaleString()}
-										</time>
+										{step.done
+											? 'Complete'
+											: step.description}
 									</small>
 								</div>
-								<span
-									className={`execution-status status-${run.status}`}>
-									{run.status ===
-									'completed'
-										? 'Finished'
-										: run.status.replaceAll(
-												'_',
-												' ',
-											)}
-								</span>
 							</li>
 						))}
-					</ul>
-				) : (
-					<p>
-						No runs yet. Try a task in an
-						agent’s playground.
+					</ol>
+				</section>
+				<section
+					className='metric-grid dashboard-metrics'
+					aria-label='Project resources'>
+					{[
+						[
+							'Connections',
+							data.servers.items
+								.length,
+							data.servers
+								.next_cursor,
+							'servers',
+						],
+						[
+							'Tools',
+							data.tools.items.length,
+							data.tools
+								.next_offset !==
+								null,
+							'tools',
+						],
+						[
+							'Agents',
+							data.agents.items
+								.length,
+							data.agents
+								.next_offset !==
+								null,
+							'agents',
+						],
+					].map(([label, count, more, path]) => (
+						<Link
+							className='metric-card'
+							href={`${base}/${path}`}
+							key={String(label)}>
+							<span>{label}</span>
+							<strong>
+								{count}
+								{more
+									? '+'
+									: ''}
+							</strong>
+							<small>
+								View{' '}
+								{String(
+									label,
+								).toLowerCase()}
+							</small>
+						</Link>
+					))}
+				</section>
+				<section
+					className='panel dashboard-section'
+					aria-labelledby='connection-health'>
+					<h2 id='connection-health'>
+						Connection health
+					</h2>
+					{data.servers.items.length ? (
+						<ul className='dashboard-list'>
+							{data.servers.items.map(
+								server => (
+									<li
+										key={
+											server.id
+										}>
+										<Link
+											href={`${base}/servers`}>
+											{
+												server.name
+											}
+										</Link>
+										<span
+											className={`execution-status status-${server.connection_status === 'connected' ? 'completed' : server.connection_status === 'error' ? 'failed' : 'queued'}`}>
+											{server.connection_status ===
+											'connected'
+												? 'Connected'
+												: server.connection_status ===
+													  'error'
+													? 'Needs attention'
+													: 'Not checked'}
+										</span>
+									</li>
+								),
+							)}
+						</ul>
+					) : (
+						<p>
+							No connections yet.
+							Start by adding an MCP
+							server.
+						</p>
+					)}
+				</section>
+				<section
+					className='panel dashboard-section'
+					aria-labelledby='recent-runs'>
+					<h2 id='recent-runs'>Recent runs</h2>
+					<p className='mcp-meta'>
+						Latest activity from the first
+						three agents in your list.
 					</p>
-				)}
-			</section>
+					{runsError ? (
+						<p role='status'>{runsError}</p>
+					) : runs.length ? (
+						<ul className='dashboard-list'>
+							{runs.map(run => (
+								<li
+									key={
+										run.id
+									}>
+									<div>
+										<Link
+											href={`${base}/agents/${run.agentId}/playground?execution=${run.id}`}>
+											{run.input.slice(
+												0,
+												120,
+											)}
+										</Link>
+										<small>
+											{
+												run.agentName
+											}{' '}
+											·{' '}
+											<time
+												dateTime={
+													run.created_at
+												}>
+												{new Date(
+													run.created_at,
+												).toLocaleString()}
+											</time>
+										</small>
+									</div>
+									<span
+										className={`execution-status status-${run.status}`}>
+										{run.status ===
+										'completed'
+											? 'Finished'
+											: run.status.replaceAll(
+													'_',
+													' ',
+												)}
+									</span>
+								</li>
+							))}
+						</ul>
+					) : (
+						<p>
+							No runs yet. Try a task
+							in an agent’s
+							playground.
+						</p>
+					)}
+				</section>
+			</details>
 		</>
 	);
 }
