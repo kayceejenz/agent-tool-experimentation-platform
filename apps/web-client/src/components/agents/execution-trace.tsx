@@ -1,4 +1,6 @@
 'use client';
+import styles from './execution-trace.module.css';
+import { StructuredPayload } from '@/components/content/structured-payload';
 import { useEffect, useMemo, useState } from 'react';
 import { usePagedCatalog } from '@/hooks/use-paged-catalog';
 import { projectRequest } from '@/lib/projects/client';
@@ -8,9 +10,11 @@ import type { ExecutionSpan, SpanSummary } from '@/types/execution';
 export function ExecutionTrace({
 	path,
 	version,
+    formatted = false,
 }: {
 	path: string;
 	version: string;
+    formatted?: boolean;
 }) {
 	const catalog = usePagedCatalog<SpanSummary>(
 		`${path}/spans?version=${encodeURIComponent(version)}`,
@@ -30,7 +34,7 @@ export function ExecutionTrace({
 		return { byId, children };
 	}, [catalog.items]);
 	return (
-		<div className='playground-detail-content'>
+		<div className={`${styles.root} playground-detail-content`}>
 			<p className='playground-trace-note'>
 				Open a step to load what the agent sent and
 				received.
@@ -56,6 +60,7 @@ export function ExecutionTrace({
 							span={span}
 							path={path}
 							byId={index.byId}
+                            formatted={formatted}
 						/>
 						<div className='execution-children'>
 							{(
@@ -64,6 +69,7 @@ export function ExecutionTrace({
 								) ?? []
 							).map(child => (
 								<SpanDetails
+                                    formatted={formatted}
 									key={
 										child.id
 									}
@@ -99,10 +105,12 @@ function SpanDetails({
 	span,
 	path,
 	byId,
+    formatted,
 }: {
 	span: SpanSummary;
 	path: string;
 	byId: Map<string, SpanSummary>;
+    formatted: boolean;
 }) {
 	const [open, setOpen] = useState(false);
 	const [payload, setPayload] = useState<ExecutionSpan | null>(null);
@@ -204,26 +212,28 @@ function SpanDetails({
 							</button>
 						</div>
 					) : payload ? (
-						<div className='trace-payloads'>
+						<div className={`trace-payloads${formatted ? ' trace-payloads-formatted' : ''}`}>
 							<div>
 								<h4>Inputs</h4>
-								<pre>
+                                {formatted ? <StructuredPayload value={payload.inputs} label='Step inputs' /> : (<pre>
 									{JSON.stringify(
 										payload.inputs,
 										null,
 										2,
 									)}
-								</pre>
+								</pre>)}
+
 							</div>
 							<div>
 								<h4>Outputs</h4>
-								<pre>
+                                {formatted ? <StructuredPayload response value={payload.outputs} label='Step response' /> : (<pre>
 									{JSON.stringify(
 										payload.outputs,
 										null,
 										2,
 									)}
-								</pre>
+								</pre>)}
+
 							</div>
 						</div>
 					) : (

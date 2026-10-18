@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from integrations.agents.model_provider import configured_secrets
 from integrations.database import Database
 from integrations.mcp.credential_cipher import CredentialCipher
+from modules.benchmarks.repos.benchmark_repo import BenchmarkRepository
 from modules.agents.repos.agent_repo import AgentRepository
 from modules.auth.helpers.passwords import Argon2idPasswordHasher
 from modules.auth.helpers.tokens import JwtAccessTokenIssuer
@@ -65,6 +66,7 @@ async def configure_dependencies(instance: FastAPI, config: Settings) -> Databas
             config.login_rate_limit,
             config.login_rate_window_seconds,
         )
+    instance.state.benchmarks = BenchmarkRepository(database)
     instance.state.agents = AgentRepository(database)
     instance.state.executions = ExecutionRepository(
         database, configured_secrets(config)

@@ -18,6 +18,7 @@ const projectSections = [
 	{ label: 'Tools', slug: 'tools', icon: Wrench },
 	{ label: 'Prompts', slug: 'prompts', icon: FileCode2 },
 	{ label: 'Agents', slug: 'agents', icon: Workflow },
+	{ label: 'Benchmarks', slug: 'benchmarks', icon: FileCode2 },
 ];
 
 export function WorkspaceNavigation({

@@ -9,6 +9,7 @@ class StartExecution(BaseModel):
     model_config = ConfigDict(extra="forbid")
     revision: int = Field(ge=1, strict=True)
     request_id: UUID
+    benchmark_id: UUID | None = None
     expectations: Expectations | None = None
     input: str = Field(min_length=1, max_length=16000)
 

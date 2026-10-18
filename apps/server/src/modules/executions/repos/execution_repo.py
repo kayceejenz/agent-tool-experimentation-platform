@@ -8,6 +8,7 @@ from psycopg.types.json import Jsonb
 
 from modules.agents.models.error_model import AgentError
 from modules.agents.repos.agent_repo import AgentRepository
+from modules.benchmarks.repos.benchmark_repo import BenchmarkRepository
 from modules.executions.helpers.snapshot import execution_snapshot
 from modules.tools.helpers.validation import redact, redact_text
 
@@ -28,6 +29,8 @@ class ExecutionRepository:
             if expectations is None
             else json.dumps([body.input, expectations], sort_keys=True)
         )
+        if body.benchmark_id:
+            digest_input = json.dumps([digest_input, str(body.benchmark_id)])
         digest = hashlib.sha256(digest_input.encode()).hexdigest()
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
@@ -82,10 +85,20 @@ class ExecutionRepository:
                     ).fetchone()
                     tool["definition"] = definition["definition"]
                     tool["alias"] = "tool_" + tool["id"].hex
+                if body.benchmark_id:
+                    reference = await BenchmarkRepository.reference(
+                        db, project_id, body.benchmark_id
+                    )
+                    if body.input != reference["input"] or expectations is not None:
+                        raise AgentError(
+                            422, "Run the saved question without judge expectations"
+                        )
                 snapshot = execution_snapshot(detail, expectations, self.secret)
+                if body.benchmark_id:
+                    snapshot["evaluation_profile"]["enabled"] = False
                 return await (
                     await db.execute(
-                        "INSERT INTO agent_platform.agent_executions(id,project_id,agent_id,agent_revision,user_id,request_id,input,input_hash,snapshot) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *",
+                        "INSERT INTO agent_platform.agent_executions(id,project_id,agent_id,agent_revision,user_id,request_id,input,input_hash,snapshot,benchmark_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *",
                         (
                             uuid4(),
                             project_id,
@@ -96,6 +109,7 @@ class ExecutionRepository:
                             self.redact_for_storage(body.input),
                             digest,
                             Jsonb(snapshot),
+                            body.benchmark_id,
                         ),
                     )
                 ).fetchone()

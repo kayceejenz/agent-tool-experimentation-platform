@@ -3,6 +3,7 @@ from typing import Annotated
 from core.settings import Settings
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from modules.benchmarks.repos.benchmark_repo import BenchmarkRepository
 from modules.agents.repos.agent_repo import AgentRepository
 from modules.auth.models.auth_user_model import AuthenticatedUser
 from modules.auth.models.error_model import InvalidAccessTokenError
@@ -104,3 +105,10 @@ def mcp_servers(request: Request) -> ServerService:
 
 
 McpServers = Annotated[ServerService, Depends(mcp_servers)]
+
+
+def benchmarks(request: Request) -> BenchmarkRepository:
+    return request.app.state.benchmarks
+
+
+Benchmarks = Annotated[BenchmarkRepository, Depends(benchmarks)]

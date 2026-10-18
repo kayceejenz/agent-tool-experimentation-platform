@@ -1,8 +1,11 @@
 'use client';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ReadableOutput } from './readable-output';
 import type { ToolExecution } from '@/types/tool';
 
 export function Execution({ execution }: { execution: ToolExecution }) {
+	const projectId = usePathname().split('/')[2];
 	const envelope =
 		execution.result && typeof execution.result === 'object'
 			? (execution.result as Record<string, unknown>)
@@ -59,6 +62,7 @@ export function Execution({ execution }: { execution: ToolExecution }) {
 			</details>
 			<div className='tool-output-readable'>
 				<h4>Result</h4>
+                {execution.status === 'success' && projectId && <Link className='button' href={`/projects/${projectId}/benchmarks?capture=${execution.id}`}>Save as benchmark</Link>}
 				<ReadableOutput value={output} />
 			</div>
 			<details>

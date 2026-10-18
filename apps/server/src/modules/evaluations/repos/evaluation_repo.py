@@ -77,6 +77,10 @@ class EvaluationRepository:
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
                 run = await self.execution(db, user_id, project_id, execution_id, True)
+                if run.get("benchmark_id"):
+                    raise AgentError(
+                        409, "This run uses tool comparison, without an LLM judge"
+                    )
                 expectations = (
                     body.expectations.model_dump(mode="json")
                     if body.expectations

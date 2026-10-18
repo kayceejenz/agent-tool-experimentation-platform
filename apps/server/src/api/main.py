@@ -7,6 +7,9 @@ from core.settings import Settings
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from modules.benchmarks.controllers.benchmark_controller import (
+    router as benchmarks_router,
+)
 from modules.agents.controllers.agent_controller import router as agents_router
 from modules.agents.models.error_model import AgentError
 from modules.auth.controllers.auth_controller import router as auth_router
@@ -58,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     instance.include_router(mcp_router, prefix="/api/v1")
     instance.include_router(tools_router, prefix="/api/v1")
     instance.include_router(prompts_router, prefix="/api/v1")
+    instance.include_router(benchmarks_router, prefix="/api/v1")
     instance.include_router(agents_router, prefix="/api/v1")
     instance.include_router(executions_router, prefix="/api/v1")
     instance.include_router(evaluations_router, prefix="/api/v1")
