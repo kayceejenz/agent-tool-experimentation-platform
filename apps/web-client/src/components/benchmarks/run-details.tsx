@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
+import { Info } from 'lucide-react';
 import { StructuredPayload } from '@/components/content/structured-payload';
 import { ReadableText } from '@/components/content/readable-text';
 import { ExecutionTrace } from '@/components/agents/execution-trace';
@@ -121,7 +122,7 @@ function BenchmarkRunDetails({
 					className='benchmark-metrics'
 					aria-label='Selected run metrics'>
 					<div>
-						<dt>Tool precision</dt>
+						<dt>Tool precision <MetricInfo label="Tool precision" explanation="The percentage of calls that used the expected tool. Only one call can match; extra or repeated calls lower the score. A dash means no calls were made." /></dt>
 						<dd>
 							{percent(
 								item.score
@@ -138,7 +139,7 @@ function BenchmarkRunDetails({
 						</dd>
 					</div>
 					<div>
-						<dt>Tool recall</dt>
+						<dt>Tool recall <MetricInfo label="Tool recall" explanation="Whether the agent called the expected tool. Each question expects one call: 100% means it used that tool; 0% means it did not." /></dt>
 						<dd>
 							{percent(
 								100 *
@@ -149,7 +150,7 @@ function BenchmarkRunDetails({
 						</dd>
 					</div>
 					<div>
-						<dt>Argument accuracy</dt>
+						<dt>Argument accuracy <MetricInfo label="Argument accuracy" explanation="Whether the expected tool received the saved inputs: 100% for an exact match, 0% if values differ. JSON key order does not matter. A dash means the expected tool was not called." /></dt>
 						<dd>
 							{percent(
 								item.score
@@ -240,4 +241,16 @@ function BenchmarkRunDetails({
 			)}
 		</section>
 	);
+}
+
+function MetricInfo({ label, explanation }: { label: string; explanation: string }) {
+    const id = useId();
+    const [open, setOpen] = useState(false);
+    return <span className='metric-info' onMouseEnter={() => setOpen(true)} onMouseLeave={event => setOpen(event.currentTarget.contains(document.activeElement))}>
+        <button type='button' className='metric-info-button' aria-label={`About ${label.toLowerCase()}`} aria-describedby={open ? id : undefined}
+            onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onClick={() => setOpen(true)} onKeyDown={event => { if (event.key === 'Escape') { setOpen(false); event.stopPropagation(); } }}>
+            <Info size={16} aria-hidden='true' />
+        </button>
+        {open && <span id={id} role='tooltip' className='metric-info-tooltip'>{explanation}</span>}
+    </span>;
 }

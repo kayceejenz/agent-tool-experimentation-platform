@@ -599,3 +599,10 @@
 .benchmark-final-answer { margin: 24px 0; }
 
 .workspace .structured-payload pre.payload-json { margin: 0; padding: 16px; max-height: 480px; overflow: auto; white-space: pre; overflow-wrap: normal; word-break: normal; border: 1px solid var(--line); border-radius: 8px; background: var(--background); font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 2; }
+
+.benchmark-metrics > div { position: relative; }
+.benchmark-metrics dt { display: flex; align-items: center; gap: 6px; }
+.metric-info { display: inline-flex; align-items: center; }
+.metric-info-button { display: inline-grid; place-items: center; padding: 4px; width: 28px; height: 28px; min-height: 28px; background: transparent; border: 0; border-radius: 50%; color: var(--muted); cursor: help; }
+.metric-info-button:hover, .metric-info-button:focus-visible { color: var(--foreground); background: var(--accent-soft); }
+.metric-info-tooltip { position: absolute; top: 44px; left: 8px; right: 8px; z-index: 5; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--foreground); box-shadow: var(--shadow); font-size: 13px; font-weight: 400; line-height: 1.6; }

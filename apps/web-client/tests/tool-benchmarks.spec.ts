@@ -378,6 +378,20 @@ test('save a manual reference and compare an agent without advanced configuratio
 			.locator('dl[aria-label="Selected run metrics"]')
 			.getByRole('definition'),
 	).toHaveText(['100.0%', '100.0%', '0.0%']);
+    const precisionInfo = details.getByRole('button', { name: 'About tool precision' });
+    await precisionInfo.hover();
+    await expect(details.getByRole('tooltip')).toContainText('extra or repeated calls');
+    await page.mouse.move(0, 0);
+    await expect(details.getByRole('tooltip')).toHaveCount(0);
+    const argumentInfo = details.getByRole('button', { name: 'About argument accuracy' });
+    await argumentInfo.focus();
+    await expect(details.getByRole('tooltip')).toContainText('JSON key order does not matter');
+    await argumentInfo.press('Escape');
+    await expect(details.getByRole('tooltip')).toHaveCount(0);
+    await details.getByRole('button', { name: 'About tool recall' }).click();
+    await expect(details.getByRole('tooltip')).toContainText('Each question expects one call');
+    await details.getByRole('button', { name: 'About tool recall' }).press('Escape');
+
 	await expect(
 		details.getByText('unexpected', { exact: false }),
 	).toBeVisible();
