@@ -87,7 +87,17 @@ export function BenchmarkRunPage({
 			)}
 			{!item && !error && <p role='status'>Loading run…</p>}
 			{item && (
-				<BenchmarkRunDetails item={item} base={base} />
+				<>
+					<Link
+						className='button'
+						href={`/projects/${project.id}/benchmarks/${item.id}`}>
+						Compare all runs
+					</Link>
+					<BenchmarkRunDetails
+						item={item}
+						base={base}
+					/>
+				</>
 			)}
 		</>
 	);
@@ -122,7 +132,13 @@ function BenchmarkRunDetails({
 					className='benchmark-metrics'
 					aria-label='Selected run metrics'>
 					<div>
-						<dt>Tool precision <MetricInfo label="Tool precision" explanation="The percentage of calls that used the expected tool. Only one call can match; extra or repeated calls lower the score. A dash means no calls were made." /></dt>
+						<dt>
+							Tool precision{' '}
+							<MetricInfo
+								label='Tool precision'
+								explanation='The percentage of calls that used the expected tool. Only one call can match; extra or repeated calls lower the score. A dash means no calls were made.'
+							/>
+						</dt>
 						<dd>
 							{percent(
 								item.score
@@ -139,7 +155,13 @@ function BenchmarkRunDetails({
 						</dd>
 					</div>
 					<div>
-						<dt>Tool recall <MetricInfo label="Tool recall" explanation="Whether the agent called the expected tool. Each question expects one call: 100% means it used that tool; 0% means it did not." /></dt>
+						<dt>
+							Tool recall{' '}
+							<MetricInfo
+								label='Tool recall'
+								explanation='Whether the agent called the expected tool. Each question expects one call: 100% means it used that tool; 0% means it did not.'
+							/>
+						</dt>
 						<dd>
 							{percent(
 								100 *
@@ -150,17 +172,17 @@ function BenchmarkRunDetails({
 						</dd>
 					</div>
 					<div>
-						<dt>Argument accuracy <MetricInfo label="Argument accuracy" explanation="Whether the expected tool received the saved inputs: 100% for an exact match, 0% if values differ. JSON key order does not matter. A dash means the expected tool was not called." /></dt>
+						<dt>
+							Argument accuracy{' '}
+							<MetricInfo
+								label='Argument accuracy'
+								explanation='Matching argument fields divided by all supplied fields. Missing, incorrect, or extra fields reduce the score. Omitted schema defaults equal explicit defaults. Each field has equal weight; nested values must match exactly. For repeated calls, the best match is used. A dash means the expected tool was not called.'
+							/>
+						</dt>
 						<dd>
 							{percent(
 								item.score
-									.matched_count
-									? item
-											.score
-											.arguments_correct
-										? 100
-										: 0
-									: null,
+									.argument_accuracy,
 							)}
 						</dd>
 					</div>
@@ -243,14 +265,50 @@ function BenchmarkRunDetails({
 	);
 }
 
-function MetricInfo({ label, explanation }: { label: string; explanation: string }) {
-    const id = useId();
-    const [open, setOpen] = useState(false);
-    return <span className='metric-info' onMouseEnter={() => setOpen(true)} onMouseLeave={event => setOpen(event.currentTarget.contains(document.activeElement))}>
-        <button type='button' className='metric-info-button' aria-label={`About ${label.toLowerCase()}`} aria-describedby={open ? id : undefined}
-            onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onClick={() => setOpen(true)} onKeyDown={event => { if (event.key === 'Escape') { setOpen(false); event.stopPropagation(); } }}>
-            <Info size={16} aria-hidden='true' />
-        </button>
-        {open && <span id={id} role='tooltip' className='metric-info-tooltip'>{explanation}</span>}
-    </span>;
+function MetricInfo({
+	label,
+	explanation,
+}: {
+	label: string;
+	explanation: string;
+}) {
+	const id = useId();
+	const [open, setOpen] = useState(false);
+	return (
+		<span
+			className='metric-info'
+			onMouseEnter={() => setOpen(true)}
+			onMouseLeave={event =>
+				setOpen(
+					event.currentTarget.contains(
+						document.activeElement,
+					),
+				)
+			}>
+			<button
+				type='button'
+				className='metric-info-button'
+				aria-label={`About ${label.toLowerCase()}`}
+				aria-describedby={open ? id : undefined}
+				onFocus={() => setOpen(true)}
+				onBlur={() => setOpen(false)}
+				onClick={() => setOpen(true)}
+				onKeyDown={event => {
+					if (event.key === 'Escape') {
+						setOpen(false);
+						event.stopPropagation();
+					}
+				}}>
+				<Info size={16} aria-hidden='true' />
+			</button>
+			{open && (
+				<span
+					id={id}
+					role='tooltip'
+					className='metric-info-tooltip'>
+					{explanation}
+				</span>
+			)}
+		</span>
+	);
 }

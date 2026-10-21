@@ -140,6 +140,7 @@ test('save a manual reference and compare an agent without advanced configuratio
 			if (!runs.has(item.id)) continue;
 			scored++;
 			item.execution_id = runs.get(item.id);
+			item.run_count = item.execution_id ? 1 : 0;
 			item.status = 'completed';
 			item.termination_reason = 'final_answer';
 			item.agent_name = 'Baseline';
@@ -157,6 +158,7 @@ test('save a manual reference and compare an agent without advanced configuratio
 			item.score = {
 				actual_count: 1,
 				matched_count: 1,
+				argument_accuracy: correct ? 100 : 0,
 				arguments_correct: correct,
 			};
 		}
@@ -171,6 +173,47 @@ test('save a manual reference and compare an agent without advanced configuratio
 	const references = (
 		await (await context.request.get(`${base}/benchmarks`)).json()
 	).items;
+	await page.route(`**${base}/benchmarks/*/runs`, async route => {
+		const benchmarkId = new URL(route.request().url()).pathname
+			.split('/')
+			.at(-2);
+		const original = references.find(
+			(item: { id: string }) => item.id === benchmarkId,
+		);
+		const correct = original.input === 'Describe this store.';
+		await route.fulfill({
+			json: {
+				benchmark: original,
+				runs: [
+					{
+						...original,
+						execution_id: runs.get(
+							original.id,
+						),
+						agent_name: 'Baseline',
+						agent_revision: 1,
+						model_settings: {
+							provider: 'openai',
+							model: 'gpt-4.1-mini',
+						},
+						latency_ms: 1250,
+						status: 'completed',
+						calls: [],
+						score: {
+							actual_count: 1,
+							matched_count: 1,
+							argument_accuracy:
+								correct
+									? 100
+									: 0,
+							arguments_correct:
+								correct,
+						},
+					},
+				],
+			},
+		});
+	});
 	await page.route(`**${base}/benchmarks/runs/*`, async route => {
 		const executionId = new URL(route.request().url()).pathname
 			.split('/')
@@ -201,6 +244,7 @@ test('save a manual reference and compare an agent without advanced configuratio
 				score: {
 					actual_count: 1,
 					matched_count: 1,
+					argument_accuracy: correct ? 100 : 0,
 					arguments_correct: correct,
 				},
 			},
@@ -299,6 +343,20 @@ test('save a manual reference and compare an agent without advanced configuratio
 	});
 	await page.goto(`/projects/${project.id}/benchmarks`);
 	await expect(
+		page.getByRole('navigation', {
+			name: 'Breadcrumb',
+			exact: true,
+		}),
+	).toHaveCount(1);
+	await expect(
+		page
+			.getByRole('navigation', {
+				name: 'Breadcrumb',
+				exact: true,
+			})
+			.locator('[aria-current=page]'),
+	).toHaveText('Benchmarks');
+	await expect(
 		page.getByRole('list', { name: 'How to use benchmarks' }),
 	).toHaveCount(0);
 	await expect(
@@ -316,12 +374,17 @@ test('save a manual reference and compare an agent without advanced configuratio
 	).toBeVisible();
 	await expect(page.getByLabel('Agent to test')).toHaveCount(0);
 	await expect(
-		page.getByRole('button', { name: 'Run: Describe this store.' }),
+		page.getByRole('link', {
+			name: 'Manage: Describe this store.',
+		}),
 	).toBeEnabled();
 	const first = page
 		.getByRole('row')
 		.filter({ hasText: 'Describe this store.' });
-	await first.getByRole('button', { name: /^Run: / }).click();
+	await first
+		.getByRole('link', { name: 'Manage: Describe this store.' })
+		.click();
+	await page.getByRole('button', { name: 'Run', exact: true }).click();
 	const popup = page.getByRole('dialog', { name: 'Run benchmark' });
 	await expect(popup).toBeVisible();
 	await expect(popup.getByLabel('Agent to test')).toBeEnabled();
@@ -329,16 +392,21 @@ test('save a manual reference and compare an agent without advanced configuratio
 	await popup.press('Escape');
 	await expect(popup).toHaveCount(0);
 	await expect(
-		first.getByRole('button', { name: /^Run: / }),
+		page.getByRole('button', { name: 'Run', exact: true }),
 	).toBeFocused();
-	await first.getByRole('button', { name: /^Run: / }).click();
+	await page.getByRole('button', { name: 'Run', exact: true }).click();
 	await popup.getByLabel('Agent to test').selectOption(agent.id);
 	await popup
 		.getByRole('button', { name: 'Start run', exact: true })
 		.click();
 	await expect(popup).toHaveCount(0);
+	await page
+		.getByRole('link', { name: 'Back to benchmarks', exact: false })
+		.click();
 	await expect(
-		first.getByRole('cell', { name: /Tool and inputs match/ }),
+		first.getByRole('link', {
+			name: 'Manage: Describe this store.',
+		}),
 	).toBeVisible();
 	await expect(
 		page.getByRole('region', { name: 'Selected run' }),
@@ -349,15 +417,21 @@ test('save a manual reference and compare an agent without advanced configuratio
 	const other = page
 		.getByRole('row')
 		.filter({ hasText: 'Tell me about this shop.' });
-	await other.getByRole('button', { name: /^Run: / }).click();
+	await other
+		.getByRole('link', { name: 'Manage: Tell me about this shop.' })
+		.click();
+	await page.getByRole('button', { name: 'Run', exact: true }).click();
 	await popup.getByLabel('Agent to test').selectOption(agent.id);
 	await popup
 		.getByRole('button', { name: 'Start run', exact: true })
 		.click();
 	await expect(popup).toHaveCount(0);
+	await page
+		.getByRole('link', { name: 'Back to benchmarks', exact: false })
+		.click();
 	await expect(
-		other.getByRole('cell', {
-			name: /Right tool, different inputs/,
+		other.getByRole('link', {
+			name: 'Manage: Tell me about this shop.',
 		}),
 	).toBeVisible();
 	await expect(page.getByRole('row').nth(1)).toContainText(
@@ -365,9 +439,22 @@ test('save a manual reference and compare an agent without advanced configuratio
 	);
 	await other
 		.getByRole('link', {
-			name: 'View result: Tell me about this shop.',
+			name: 'Manage: Tell me about this shop.',
 		})
 		.click();
+	await expect(
+		page.getByRole('heading', { name: 'Manage benchmark' }),
+	).toBeVisible();
+	await expect(
+		page.getByRole('cell', { name: '1.25 s', exact: true }),
+	).toBeVisible();
+	await expect(
+		page.getByRole('cell', { name: /gpt-4.1-mini/ }),
+	).toBeVisible();
+	await expect(
+		page.getByRole('cell', { name: '0.0%', exact: true }),
+	).toBeVisible();
+	await page.getByRole('link', { name: 'View run', exact: true }).click();
 	await expect(page).toHaveURL(/benchmarks\/runs\//);
 	await page.reload();
 	await expect(page.getByLabel('Agent to test')).toHaveCount(0);
@@ -378,19 +465,33 @@ test('save a manual reference and compare an agent without advanced configuratio
 			.locator('dl[aria-label="Selected run metrics"]')
 			.getByRole('definition'),
 	).toHaveText(['100.0%', '100.0%', '0.0%']);
-    const precisionInfo = details.getByRole('button', { name: 'About tool precision' });
-    await precisionInfo.hover();
-    await expect(details.getByRole('tooltip')).toContainText('extra or repeated calls');
-    await page.mouse.move(0, 0);
-    await expect(details.getByRole('tooltip')).toHaveCount(0);
-    const argumentInfo = details.getByRole('button', { name: 'About argument accuracy' });
-    await argumentInfo.focus();
-    await expect(details.getByRole('tooltip')).toContainText('JSON key order does not matter');
-    await argumentInfo.press('Escape');
-    await expect(details.getByRole('tooltip')).toHaveCount(0);
-    await details.getByRole('button', { name: 'About tool recall' }).click();
-    await expect(details.getByRole('tooltip')).toContainText('Each question expects one call');
-    await details.getByRole('button', { name: 'About tool recall' }).press('Escape');
+	const precisionInfo = details.getByRole('button', {
+		name: 'About tool precision',
+	});
+	await precisionInfo.hover();
+	await expect(details.getByRole('tooltip')).toContainText(
+		'extra or repeated calls',
+	);
+	await page.mouse.move(0, 0);
+	await expect(details.getByRole('tooltip')).toHaveCount(0);
+	const argumentInfo = details.getByRole('button', {
+		name: 'About argument accuracy',
+	});
+	await argumentInfo.focus();
+	await expect(details.getByRole('tooltip')).toContainText(
+		'Matching argument fields divided by all supplied fields',
+	);
+	await argumentInfo.press('Escape');
+	await expect(details.getByRole('tooltip')).toHaveCount(0);
+	await details
+		.getByRole('button', { name: 'About tool recall' })
+		.click();
+	await expect(details.getByRole('tooltip')).toContainText(
+		'Each question expects one call',
+	);
+	await details
+		.getByRole('button', { name: 'About tool recall' })
+		.press('Escape');
 
 	await expect(
 		details.getByText('unexpected', { exact: false }),
@@ -479,7 +580,7 @@ test('save a manual reference and compare an agent without advanced configuratio
 	await expect(page.getByLabel('Agent to test')).toHaveCount(0);
 	await expect(
 		other.getByRole('link', {
-			name: 'View result: Tell me about this shop.',
+			name: 'Manage: Tell me about this shop.',
 		}),
 	).toBeVisible();
 	await expect(page.getByRole('definition')).toHaveCount(0);
@@ -488,9 +589,10 @@ test('save a manual reference and compare an agent without advanced configuratio
 	).toHaveCount(0);
 	await first
 		.getByRole('link', {
-			name: 'View result: Describe this store.',
+			name: 'Manage: Describe this store.',
 		})
 		.click();
+	await page.getByRole('link', { name: 'View run', exact: true }).click();
 	await expect(
 		details
 			.locator('dl[aria-label="Selected run metrics"]')
@@ -501,7 +603,7 @@ test('save a manual reference and compare an agent without advanced configuratio
 		.click();
 	await expect(
 		first.getByRole('link', {
-			name: 'View result: Describe this store.',
+			name: 'Manage: Describe this store.',
 		}),
 	).toBeVisible();
 	await page.screenshot({
@@ -520,4 +622,93 @@ test('save a manual reference and compare an agent without advanced configuratio
 		path: 'test-results/simple-benchmarks-mobile.png',
 		fullPage: true,
 	});
+	await first
+		.getByRole('link', { name: 'Manage: Describe this store.' })
+		.click();
+	await page
+		.getByRole('button', { name: 'Delete question', exact: true })
+		.click();
+	await expect(
+		page.getByRole('dialog', {
+			name: 'Delete benchmark question?',
+		}),
+	).toBeVisible();
+	await expect(
+		page.getByRole('button', { name: 'Confirm delete' }),
+	).toBeVisible();
+	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await expect(
+		page.getByRole('dialog', {
+			name: 'Delete benchmark question?',
+		}),
+	).not.toBeVisible();
+	await expect(
+		page.getByRole('button', {
+			name: 'Delete question',
+			exact: true,
+		}),
+	).toBeFocused();
+	await page
+		.getByRole('button', { name: 'Delete question', exact: true })
+		.click();
+	await page.getByRole('button', { name: 'Confirm delete' }).click();
+	await expect(page).toHaveURL(`/projects/${project.id}/benchmarks`);
+	await expect(
+		other.getByRole('link', {
+			name: 'Manage: Tell me about this shop.',
+		}),
+	).toBeVisible();
+	await expect(first).toHaveCount(0);
+	await page.unrouteAll({ behavior: 'wait' });
+	await page.route(`**${base}/benchmarks/performance`, route =>
+		route.fulfill({
+			json: {
+				items: [
+					{
+						agent_id: 'agent-one',
+						agent_name: 'Baseline',
+						runs: 3,
+						questions: 2,
+						completed: 2,
+						precision: 100,
+						recall: 66.6667,
+						argument_accuracy: 75,
+						completion_rate: 66.6667,
+						latency_ms: 1250,
+					},
+				],
+			},
+		}),
+	);
+	await page
+		.getByRole('link', { name: 'Agent performance', exact: true })
+		.click();
+	await expect(
+		page.getByRole('heading', { name: 'Agent performance' }),
+	).toBeVisible();
+	await expect(
+		page
+			.getByRole('navigation', {
+				name: 'Breadcrumb',
+				exact: true,
+			})
+			.locator('[aria-current=page]'),
+	).toHaveText('Agent performance');
+	const performanceTable = page.getByRole('region', {
+		name: 'Agent performance comparison',
+	});
+	await expect(
+		performanceTable.getByRole('cell', { name: /75\.0%/ }),
+	).toBeVisible();
+	await expect(
+		performanceTable.getByRole('cell', { name: /1\.25 s/ }),
+	).toBeVisible();
+	expect(
+		await page.evaluate(
+			() =>
+				document.documentElement.scrollWidth <=
+				innerWidth,
+		),
+	).toBeTruthy();
+	await page.unrouteAll({ behavior: 'wait' });
 });

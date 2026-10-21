@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { ProjectSync } from '@/components/projects/project-provider';
 import { projectRequest, projectWrite } from '@/lib/projects/client';
 import type { Project } from '@/types/workspace';
-import { pending, resultLabel } from './run-details';
-import { RunBenchmarkDialog } from './run-dialog';
-import type { Benchmark, BenchmarkPage, Capture } from '@/types/benchmark';
+import { pending } from './run-details';
+import type { BenchmarkPage, Capture } from '@/types/benchmark';
 
 export function Benchmarks({ project }: { project: Project }) {
 	const base = `/${project.id}`;
@@ -15,8 +14,6 @@ export function Benchmarks({ project }: { project: Project }) {
 	const [capture, setCapture] = useState<Capture | null>(null);
 	const [question, setQuestion] = useState('');
 	const [verified, setVerified] = useState(false);
-	const [runTarget, setRunTarget] = useState<Benchmark | null>(null);
-	const runButton = useRef<HTMLButtonElement | null>(null);
 	const [data, setData] = useState<BenchmarkPage | null>(null);
 	const [refresh, setRefresh] = useState(0);
 	const [busy, setBusy] = useState('');
@@ -93,7 +90,7 @@ export function Benchmarks({ project }: { project: Project }) {
 			setQuestion('');
 			setVerified(false);
 			setNotice(
-				'Example saved. Click Run to choose an agent and test the question.',
+				'Example saved. Open Manage to run it against an agent.',
 			);
 			setRefresh(n => n + 1);
 		} catch (e) {
@@ -119,13 +116,20 @@ export function Benchmarks({ project }: { project: Project }) {
 						yourself.
 					</p>
 				</div>
-				{canWrite && (
+				<div className='benchmark-toolbar-actions'>
 					<Link
-						className='button primary'
-						href={`/projects/${project.id}/tools`}>
-						Add new example
+						className='button'
+						href={`/projects/${project.id}/benchmarks/performance`}>
+						Agent performance
 					</Link>
-				)}
+					{canWrite && (
+						<Link
+							className='button primary'
+							href={`/projects/${project.id}/tools`}>
+							Add new example
+						</Link>
+					)}
+				</div>
 			</header>
 			{error && (
 				<p role='alert' className='project-error'>
@@ -259,23 +263,13 @@ export function Benchmarks({ project }: { project: Project }) {
 				{!data ? (
 					<p role='status'>Loading examples…</p>
 				) : !data.items.length ? (
-					<div className='benchmark-empty'>
-						<h3>Start with one question</h3>
+					<div className='empty-state'>
+						<h2>No benchmarks yet</h2>
 						<p>
-							Open{' '}
-							<Link
-								href={`/projects/${project.id}/tools`}>
-								Tools
-							</Link>
-							: test a tool, verify
-							its result, then select{' '}
-							<strong>
-								Save as
-								benchmark
-							</strong>
-							. You’ll then add the
-							question the agent
-							should answer.
+							Create a benchmark from
+							a verified tool test to
+							check your agent’s tool
+							use.
 						</p>
 					</div>
 				) : (
@@ -300,9 +294,6 @@ export function Benchmarks({ project }: { project: Project }) {
 										<th scope='col'>
 											Expected
 											tool
-										</th>
-										<th scope='col'>
-											Result
 										</th>
 										<th scope='col'>
 											Action
@@ -333,88 +324,13 @@ export function Benchmarks({ project }: { project: Project }) {
 														}
 													</small>
 												</td>
-												<td data-label='Result'>
-													{item.agent_name && (
-														<small>
-															{
-																item.agent_name
-															}{' '}
-															·
-															v
-															{
-																item.agent_revision
-															}
-														</small>
-													)}
-													<span
-														className={`benchmark-result ${item.score && item.score.arguments_correct && item.score.actual_count === 1 ? 'benchmark-match' : ''}`}>
-														{resultLabel(
-															item,
-														)}
-													</span>
-													{item.execution_id &&
-														!pending(
-															item,
-														) &&
-														item.status !==
-															'completed' && (
-															<small>
-																Run{' '}
-																{
-																	item.status
-																}
-																{item.termination_reason
-																	? ` · ${item.termination_reason.replaceAll('_', ' ')}`
-																	: ''}
-																.
-																Calls
-																shown
-																may
-																be
-																incomplete.
-															</small>
-														)}
-												</td>
 												<td data-label='Action'>
-													<div className='benchmark-run-actions'>
-														<button
-															className='button primary'
-															aria-label={`${item.execution_id ? 'Run again' : 'Run'}: ${item.input}`}
-															disabled={
-																!canWrite ||
-																!!busy ||
-																pending(
-																	item,
-																)
-															}
-															onClick={event => {
-																runButton.current =
-																	event.currentTarget;
-																setRunTarget(
-																	item,
-																);
-															}}>
-															{busy ===
-															item.id
-																? 'Starting…'
-																: pending(
-																			item,
-																	  )
-																	? 'In progress'
-																	: item.execution_id
-																		? 'Run again'
-																		: 'Run'}
-														</button>
-														{item.execution_id && (
-															<Link
-																className='button'
-																aria-label={`View result: ${item.input}`}
-																href={`/projects/${project.id}/benchmarks/runs/${item.execution_id}`}>
-																View
-																result
-															</Link>
-														)}
-													</div>
+													<Link
+														className='button'
+														aria-label={`Manage: ${item.input}`}
+														href={`/projects/${project.id}/benchmarks/${item.id}`}>
+														Manage
+													</Link>
 												</td>
 											</tr>
 										),
@@ -425,22 +341,6 @@ export function Benchmarks({ project }: { project: Project }) {
 					</>
 				)}
 			</section>
-			{runTarget && (
-				<RunBenchmarkDialog
-					projectId={project.id}
-					item={runTarget}
-					onClose={() => {
-						setRunTarget(null);
-						runButton.current?.focus();
-					}}
-					onStarted={() => {
-						setNotice(
-							'Run started. Open View result to follow its progress.',
-						);
-						setRefresh(n => n + 1);
-					}}
-				/>
-			)}
 		</>
 	);
 }

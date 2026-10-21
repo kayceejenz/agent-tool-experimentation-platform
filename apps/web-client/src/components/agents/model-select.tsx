@@ -3,6 +3,7 @@ import {
 	modelCatalog,
 	modelOptionLabel,
 	pricingSources,
+	providerLabels,
 } from '@/lib/agents/model-catalog';
 
 type Props = {
@@ -56,7 +57,14 @@ export function ModelSelect({
 							{value} · Saved model
 						</option>
 					)}
-				{['openai', 'google'].map(
+				{(
+					[
+						'openai',
+						'google',
+						'anthropic',
+						'ollama',
+					] as const
+				).map(
 					group =>
 						models.some(
 							model =>
@@ -66,10 +74,9 @@ export function ModelSelect({
 							<optgroup
 								key={group}
 								label={
-									group ===
-									'openai'
-										? 'OpenAI'
-										: 'Google Gemini'
+									providerLabels[
+										group
+									]
 								}>
 								{models
 									.filter(
@@ -98,12 +105,18 @@ export function ModelSelect({
 			</select>
 			{selected && (
 				<small>
-					{selected.performance}. Standard text
-					pricing: ${selected.input.toFixed(2)}{' '}
-					input / ${selected.output.toFixed(2)}{' '}
-					output per 1M tokens.
+					{selected.performance}.{' '}
+					{selected.provider === 'ollama'
+						? 'Pull this exact model in Ollama before running it. Local inference has no per-token API fee; hardware costs still apply.'
+						: selected.input !== null &&
+							  selected.output !==
+									null
+							? `Standard text pricing: $${selected.input.toFixed(2)} input / $${selected.output.toFixed(2)} output per 1M tokens. `
+							: 'Check current rates with the provider. '}
 					{selected.id === 'gemini-2.5-pro' &&
-						' For prompts up to 200k tokens; longer prompts cost more.'}{' '}
+						' For prompts up to 200k tokens; longer prompts cost more. '}
+					{selected.id === 'claude-haiku-5-5' &&
+						' For prompts up to 100k tokens; longer prompts cost more. '}
 					<a
 						href={
 							pricingSources[
@@ -113,14 +126,16 @@ export function ModelSelect({
 						}
 						target='_blank'
 						rel='noreferrer'>
-						Provider pricing
+						{selected.provider === 'ollama'
+							? 'Model details'
+							: 'Provider pricing'}
 					</a>
 				</small>
 			)}
 			<small>
 				Cost and performance labels are guidance, not
-				benchmark scores. Prices checked 11 Oct 2026;
-				actual cost depends on usage and provider rates.
+				benchmark scores; actual cost depends on usage,
+				model access and provider rates.
 			</small>
 		</label>
 	);

@@ -3,6 +3,7 @@ import json
 from uuid import uuid4
 
 from core.serialization import json_value
+from integrations.agents.model_provider import SUPPORTED_PROVIDERS
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -61,12 +62,12 @@ class ExecutionRepository:
                     raise AgentError(
                         409, "Enable a ready, current agent revision before running"
                     )
-                if detail["model_settings"]["provider"].lower() not in (
-                    "openai",
-                    "google",
+                if (
+                    detail["model_settings"]["provider"].lower()
+                    not in SUPPORTED_PROVIDERS
                 ):
                     raise AgentError(
-                        422, "The runtime supports OpenAI and Google providers"
+                        422, "The runtime supports OpenAI, Google, Anthropic and Ollama"
                     )
                 pending = await (
                     await db.execute(

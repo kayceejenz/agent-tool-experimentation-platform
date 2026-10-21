@@ -141,6 +141,43 @@ export function assertProjectPayload(
 			return invalid();
 		return;
 	}
+	if (route.endsWith('/benchmarks/performance') && method === 'GET') {
+		const count = (n: unknown) =>
+			Number.isSafeInteger(n) && Number(n) >= 0;
+		const percentage = (n: unknown) =>
+			n === null ||
+			(typeof n === 'number' &&
+				Number.isFinite(n) &&
+				n >= 0 &&
+				n <= 100);
+		if (
+			!Array.isArray(value.items) ||
+			!value.items.every(
+				item =>
+					isRecord(item) &&
+					text(item.agent_id) &&
+					text(item.agent_name) &&
+					count(item.runs) &&
+					count(item.questions) &&
+					count(item.completed) &&
+					[
+						'precision',
+						'recall',
+						'argument_accuracy',
+						'completion_rate',
+					].every(key => percentage(item[key])) &&
+					(item.latency_ms === null ||
+						(typeof item.latency_ms ===
+							'number' &&
+							Number.isFinite(
+								item.latency_ms,
+							) &&
+							item.latency_ms >= 0)),
+			)
+		)
+			return invalid();
+		return;
+	}
 	const catalog =
 		/\/(tools|prompts|spans|evaluations)$/.test(route) &&
 		method === 'GET';

@@ -59,3 +59,20 @@ def test_empty_project_returns_zero_filled_days():
     assert summary["totals"]["total_tokens"] == 0
     assert summary["totals"]["estimated_cost_usd"] == 0
     assert summary["daily"][0]["date"] == "2026-09-29"
+
+
+def test_small_hosted_model_costs_are_included():
+    nano, haiku = row(), row()
+    nano.update(model="gpt-4.1-nano")
+    haiku.update(provider="anthropic", model="claude-haiku-4-5-20251001")
+    summary = usage_summary([nano, haiku], date(2026, 10, 21))
+    assert summary["totals"]["estimated_cost_usd"] == Decimal("1.64")
+    assert summary["totals"]["unpriced_calls"] == 0
+
+
+def test_haiku_long_context_rates():
+    short, long = row(), row()
+    short.update(provider="anthropic", model="claude-haiku-5-5")
+    long.update(provider="anthropic", model="claude-haiku-5-5", long_context=True)
+    summary = usage_summary([short, long], date(2026, 10, 21))
+    assert summary["totals"]["estimated_cost_usd"] == Decimal("0.90")

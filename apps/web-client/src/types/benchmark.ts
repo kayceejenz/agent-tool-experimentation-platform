@@ -11,6 +11,7 @@ export type Benchmark = {
 	tool_name: string;
 	server_name: string;
 	arguments: Record<string, unknown>;
+	run_count?: number;
 	execution_id: string | null;
 	agent_name: string | null;
 	agent_revision: number | null;
@@ -22,6 +23,9 @@ export type Benchmark = {
 		actual_count: number;
 		matched_count: number;
 		arguments_correct: boolean | null;
+		argument_accuracy: number | null;
+		matched_arguments: number | null;
+		total_arguments: number | null;
 	} | null;
 };
 export type BenchmarkPage = {

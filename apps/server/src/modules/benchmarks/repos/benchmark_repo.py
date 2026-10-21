@@ -3,7 +3,7 @@ from psycopg.types.json import Jsonb
 
 from modules.agents.models.error_model import AgentError
 from modules.agents.repos.agent_repo import AgentRepository
-from modules.benchmarks.helpers.scoring import score_call, totals
+from modules.benchmarks.helpers.scoring import model_performance, score_call, totals
 
 
 class BenchmarkRepository:
@@ -83,7 +83,7 @@ class BenchmarkRepository:
     async def reference(db, project_id, benchmark_id):
         row = await (
             await db.execute(
-                "SELECT * FROM agent_platform.tool_benchmarks WHERE id=%s AND project_id=%s",
+                "SELECT * FROM agent_platform.tool_benchmarks WHERE id=%s AND project_id=%s AND deleted_at IS NULL",
                 (benchmark_id, project_id),
             )
         ).fetchone()
@@ -103,7 +103,9 @@ class BenchmarkRepository:
                 rows = await (
                     await db.execute(
                         """SELECT b.*,e.id AS execution_id,e.status,e.termination_reason,
-                              e.agent_revision,e.agent_id,e.agent_name
+                              e.agent_revision,e.agent_id,e.agent_name,
+                              (SELECT count(*) FROM agent_platform.agent_executions runs
+                               WHERE runs.benchmark_id=b.id AND runs.project_id=b.project_id) AS run_count
                        FROM agent_platform.tool_benchmarks b
                        LEFT JOIN LATERAL (
                         SELECT id,status,termination_reason,agent_revision,agent_id,
@@ -112,7 +114,7 @@ class BenchmarkRepository:
                         WHERE benchmark_id=b.id AND (%s::uuid IS NULL OR (agent_id=%s AND agent_revision=%s))
                         ORDER BY created_at DESC,id DESC LIMIT 1
                        ) e ON true
-                       WHERE b.project_id=%s ORDER BY b.created_at DESC,b.id DESC""",
+                       WHERE b.project_id=%s AND b.deleted_at IS NULL ORDER BY b.created_at DESC,b.id DESC""",
                         (agent_id, agent_id, revision, project_id),
                     )
                 ).fetchall()
@@ -140,6 +142,15 @@ class BenchmarkRepository:
             )
         ).fetchall()
         if row["status"] not in ("queued", "running"):
+            definition = await (
+                await db.execute(
+                    "SELECT definition FROM agent_platform.tool_revisions WHERE tool_id=%s AND revision=%s",
+                    (row["tool_id"], row["tool_revision"]),
+                )
+            ).fetchone()
+            row["input_schema"] = (
+                definition["definition"].get("inputSchema", {}) if definition else {}
+            )
             row["score"] = score_call(row, row["calls"])
 
     async def run(self, user_id, project_id, execution_id):
@@ -161,3 +172,70 @@ class BenchmarkRepository:
                     raise AgentError(404, "Benchmark run not found")
                 await self.add_score(db, row)
                 return row
+
+    async def history(self, user_id, project_id, benchmark_id):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await AgentRepository.member(db, user_id, project_id)
+                reference = await self.reference(db, project_id, benchmark_id)
+                runs = await (
+                    await db.execute(
+                        """SELECT id AS execution_id,status,termination_reason,agent_revision,
+                              snapshot->>'name' AS agent_name,
+                              snapshot->'model_settings' AS model_settings,created_at,
+                              CASE WHEN started_at IS NOT NULL AND finished_at IS NOT NULL
+                                   THEN greatest(0,extract(epoch FROM finished_at-started_at)*1000)::double precision
+                              END AS latency_ms
+                       FROM agent_platform.agent_executions
+                       WHERE benchmark_id=%s AND project_id=%s
+                       ORDER BY created_at DESC,id DESC""",
+                        (benchmark_id, project_id),
+                    )
+                ).fetchall()
+                for run in runs:
+                    run["tool_id"] = reference["tool_id"]
+                    run["tool_revision"] = reference["tool_revision"]
+                    run["arguments"] = reference["arguments"]
+                    await self.add_score(db, run)
+                return {"benchmark": reference, "runs": runs}
+
+    async def delete(self, user_id, project_id, benchmark_id):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await AgentRepository.member(db, user_id, project_id, True)
+                row = await (
+                    await db.execute(
+                        """UPDATE agent_platform.tool_benchmarks
+                       SET deleted_at=COALESCE(deleted_at,now())
+                       WHERE id=%s AND project_id=%s RETURNING id""",
+                        (benchmark_id, project_id),
+                    )
+                ).fetchone()
+                if not row:
+                    raise AgentError(404, "Benchmark not found")
+                return {"deleted": True}
+
+    async def performance(self, user_id, project_id):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await AgentRepository.member(db, user_id, project_id)
+                rows = await (
+                    await db.execute(
+                        """SELECT e.benchmark_id,e.status,e.agent_id,
+                       e.snapshot->>'name' AS agent_name,
+                       b.tool_id,b.arguments,r.definition->'inputSchema' AS input_schema,
+                       CASE WHEN e.started_at IS NOT NULL AND e.finished_at IS NOT NULL
+                            THEN greatest(0,extract(epoch FROM e.finished_at-e.started_at)*1000)::double precision
+                       END AS latency_ms,
+                       COALESCE((SELECT jsonb_agg(jsonb_build_object('tool_id',s.tool_id,'inputs',s.inputs))
+                                 FROM agent_platform.execution_spans s
+                                 WHERE s.execution_id=e.id AND s.kind='tool'),'[]'::jsonb) AS calls
+                       FROM agent_platform.agent_executions e
+                       JOIN agent_platform.tool_benchmarks b ON b.id=e.benchmark_id
+                       JOIN agent_platform.tool_revisions r ON r.tool_id=b.tool_id AND r.revision=b.tool_revision
+                       WHERE e.project_id=%s AND b.project_id=%s AND b.deleted_at IS NULL
+                         AND e.status NOT IN ('queued','running') ORDER BY e.created_at,e.id""",
+                        (project_id, project_id),
+                    )
+                ).fetchall()
+                return {"items": model_performance(rows)}

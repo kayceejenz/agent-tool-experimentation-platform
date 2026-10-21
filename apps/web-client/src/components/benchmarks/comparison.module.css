@@ -1,0 +1,131 @@
+.wrap {
+	max-width: 100%;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+}
+
+.table.table {
+	min-width: 1040px;
+	line-height: 1.5;
+}
+
+.table.table :is(th, td) {
+	padding: 16px;
+	vertical-align: middle;
+	overflow-wrap: normal;
+}
+
+.table.table th {
+	white-space: nowrap;
+	background: var(--subtle);
+}
+
+.table.table td:first-child {
+	min-width: 160px;
+	max-width: 240px;
+	overflow-wrap: anywhere;
+}
+
+.table.table td:nth-child(2) {
+	min-width: 180px;
+	max-width: 260px;
+	overflow-wrap: anywhere;
+}
+
+.table.table td:nth-child(3),
+.table.table td:last-child {
+	white-space: nowrap;
+}
+
+.table.table small {
+	margin-top: 4px;
+}
+
+.table.table .score {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.table.table td.score {
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.status {
+	display: inline-block;
+	padding: 4px 9px;
+	background: var(--subtle);
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	font-size: 12px;
+	white-space: nowrap;
+	text-transform: capitalize;
+}
+
+@media (max-width: 760px) {
+	.table.table {
+		min-width: 0;
+	}
+	.table.table :is(td, th) {
+		padding: 0;
+	}
+	.table.table td:first-child,
+	.table.table td:nth-child(2) {
+		min-width: 0;
+		max-width: none;
+	}
+	.table.table .score {
+		text-align: left;
+	}
+}
+
+.details {
+	margin-bottom: 20px;
+}
+.question {
+	margin: 12px 0 20px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.metadata {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px 40px;
+	margin: 0 0 20px;
+}
+.metadata dt {
+	color: var(--muted);
+	font-size: 13px;
+	margin-bottom: 4px;
+}
+.metadata dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+.deleteButton.deleteButton {
+	color: #fff;
+	background: #b42318;
+	border-color: #b42318;
+}
+.deleteButton.deleteButton:hover:not(:disabled) {
+	background: #912018;
+	border-color: #912018;
+}
+
+.table.performance td:nth-child(2) {
+	min-width: 0;
+	max-width: none;
+}
+.table.performance td:first-child {
+	min-width: 180px;
+}

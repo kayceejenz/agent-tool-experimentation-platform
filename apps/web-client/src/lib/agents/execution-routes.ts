@@ -57,7 +57,7 @@ export async function executionRoute(
 				403: 'Your role cannot run or cancel agents.',
 				404: 'Execution not found or access removed.',
 				409: 'Enable the current agent revision and its tools, or wait for pending runs to finish.',
-				422: 'Check the task and select an OpenAI agent configuration.',
+				422: 'Check the task and select a supported model configuration.',
 				503: 'Executions are temporarily unavailable. Please try again.',
 			}),
 			request.method === 'POST' && mode === 'agent'

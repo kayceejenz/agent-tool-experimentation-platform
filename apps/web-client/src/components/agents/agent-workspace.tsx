@@ -32,7 +32,6 @@ export function AgentWorkspace({
 
 		let active = true;
 
-
 		void projectRequest<Agent>(`/${project.id}/agents/${agentId}`, {
 			signal: controller.signal,
 		})
@@ -61,24 +60,22 @@ export function AgentWorkspace({
 	return (
 		<>
 			<ProjectSync project={project} />
-			<nav
-				className='workspace-breadcrumb'
-				aria-label='Breadcrumb'>
-				<Link href={`/projects/${project.id}`}>
-					{project.name}
-				</Link>
-				<span aria-hidden='true'>/</span>
-				<Link href={base}>Agents</Link>
-				<span aria-hidden='true'>/</span>
-				<span aria-current='page'>
-					{playground
-						? 'Playground'
-						: isNew
-							? 'Create agent'
-							: 'Configuration'}
-				</span>
-			</nav>
-   <header className='workspace-header'><div><h1>{playground ? 'Playground' : isNew ? 'Create an agent' : 'Agent configuration'}</h1><p>{playground ? 'Run a task, review the answer, and inspect the evidence when needed.' : 'Choose instructions, a model, and tools. Advanced settings are optional.'}</p></div></header>
+			<header className='workspace-header'>
+				<div>
+					<h1>
+						{playground
+							? 'Playground'
+							: isNew
+								? 'Create an agent'
+								: 'Agent configuration'}
+					</h1>
+					<p>
+						{playground
+							? 'Run a task, review the answer, and inspect the evidence when needed.'
+							: 'Choose instructions, a model, and tools. Advanced settings are optional.'}
+					</p>
+				</div>
+			</header>
 
 			{!isNew && agent && (
 				<nav

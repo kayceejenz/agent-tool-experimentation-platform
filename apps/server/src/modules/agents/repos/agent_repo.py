@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+from integrations.agents.model_provider import SUPPORTED_PROVIDERS
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -178,7 +179,7 @@ class AgentRepository:
             configuration_issues=issues,
             configuration_ready=not issues,
             runtime_available=row["model_settings"]["provider"].lower()
-            in ("openai", "google"),
+            in SUPPORTED_PROVIDERS,
         )
         return result
 

@@ -25,11 +25,37 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8001, ge=1, le=65535)
     openai_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
+    anthropic_api_key: SecretStr | None = None
+    ollama_base_url: str = "http://127.0.0.1:11434/v1/"
+    ollama_api_key: SecretStr | None = None
 
-    @field_validator("openai_api_key", "google_api_key", mode="before")
+    @field_validator(
+        "openai_api_key",
+        "google_api_key",
+        "anthropic_api_key",
+        "ollama_api_key",
+        mode="before",
+    )
     @classmethod
     def empty_openai_key(cls, value):
         return None if value == "" else value
+
+    @field_validator("ollama_base_url")
+    @classmethod
+    def validate_ollama_url(cls, value):
+        url = urlsplit(value)
+        if (
+            url.scheme not in ("http", "https")
+            or not url.hostname
+            or url.username
+            or url.password
+            or url.query
+            or url.fragment
+        ):
+            raise ValueError(
+                "Set an absolute Ollama HTTP base URL without credentials or query parameters"
+            )
+        return value.rstrip("/") + "/"
 
     database_url: SecretStr | None = None
     migration_database_url: SecretStr | None = None

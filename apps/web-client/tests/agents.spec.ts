@@ -96,6 +96,27 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
 	await dialog
 		.getByRole('combobox', { name: 'Model', exact: true })
+
+		.selectOption('qwen3:4b');
+	await expect(
+		dialog.getByText('Pull this exact model', { exact: false }),
+	).toBeVisible();
+	await dialog
+		.getByRole('combobox', { name: 'Model', exact: true })
+		.selectOption('claude-haiku-4-5-20251001');
+	await expect(
+		dialog.getByText('Pinned small Claude model', { exact: false }),
+	).toBeVisible();
+	await dialog
+		.getByRole('combobox', { name: 'Model', exact: true })
+		.selectOption('gpt-4.1-nano');
+	await expect(
+		dialog.getByText('Fast · small-model baseline', {
+			exact: false,
+		}),
+	).toBeVisible();
+	await dialog
+		.getByRole('combobox', { name: 'Model', exact: true })
 		.selectOption('gpt-4.1-mini');
 	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
 	await dialog.getByRole('checkbox', { name: /describe_store/ }).check();

@@ -1,38 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ReadableOutput } from './readable-output';
+import { StructuredPayload } from '@/components/content/structured-payload';
 import type { ToolExecution } from '@/types/tool';
 
 export function Execution({ execution }: { execution: ToolExecution }) {
 	const projectId = usePathname().split('/')[2];
-	const envelope =
-		execution.result && typeof execution.result === 'object'
-			? (execution.result as Record<string, unknown>)
-			: null;
-	let output =
-		envelope?.structuredContent ??
-		envelope?.content ??
-		execution.result;
-	if (
-		Array.isArray(output) &&
-		output.every(
-			block =>
-				block &&
-				typeof block === 'object' &&
-				(block as Record<string, unknown>).type ===
-					'text',
-		)
-	) {
-		const text = output
-			.map(block => (block as Record<string, unknown>).text)
-			.join('\n');
-		try {
-			output = JSON.parse(text);
-		} catch {
-			output = text;
-		}
-	}
 	return (
 		<div>
 			<p className='tool-result-meta'>
@@ -52,29 +25,27 @@ export function Execution({ execution }: { execution: ToolExecution }) {
 			)}
 			<details>
 				<summary>Saved inputs</summary>
-				<pre>
-					{JSON.stringify(
-						execution.inputs,
-						null,
-						2,
-					)}
-				</pre>
+				<StructuredPayload
+					value={execution.inputs}
+					label='Saved inputs'
+				/>
 			</details>
 			<div className='tool-output-readable'>
 				<h4>Result</h4>
-                {execution.status === 'success' && projectId && <Link className='button' href={`/projects/${projectId}/benchmarks?capture=${execution.id}`}>Save as benchmark</Link>}
-				<ReadableOutput value={output} />
-			</div>
-			<details>
-				<summary>Raw response</summary>
-				<pre>
-					{JSON.stringify(
-						execution.result,
-						null,
-						2,
+				{execution.status === 'success' &&
+					projectId && (
+						<Link
+							className='button'
+							href={`/projects/${projectId}/benchmarks?capture=${execution.id}`}>
+							Save as benchmark
+						</Link>
 					)}
-				</pre>
-			</details>
+				<StructuredPayload
+					value={execution.result}
+					label='Tool response'
+					response
+				/>
+			</div>
 		</div>
 	);
 }

@@ -298,3 +298,57 @@ def test_worker_cancels_inflight_model_with_terminal_evidence(connections, monke
         detail["status"] == "cancelled" and detail["termination_reason"] == "cancelled"
     )
     assert detail["spans"][0]["status"] == "unknown"
+
+
+@pytest.mark.parametrize(
+    "provider,model",
+    [("anthropic", "claude-haiku-4-5-20251001"), ("ollama", "qwen3:4b")],
+)
+def test_small_providers_use_the_existing_execution_queue(
+    connections, monkeypatch, provider, model
+):
+    client, config, users, project, _, _, _ = ready(connections, monkeypatch)
+    owner = users[0][1]
+    base = f"/api/v1/projects/{project}/agents"
+    response = client.post(
+        base,
+        headers=owner,
+        json={
+            "name": "Small provider",
+            **prompts(client, project, owner),
+            "model_settings": {"provider": provider, "model": model},
+            "evaluation_profile": {"enabled": False},
+        },
+    )
+    assert response.status_code == 201, response.text
+    agent = response.json()
+    assert agent["runtime_available"]
+    client.patch(
+        base + "/" + agent["id"],
+        headers=owner,
+        json={"enabled": True, "base_revision": 1},
+    )
+    url = base + "/" + agent["id"] + "/executions"
+    body = {"revision": 1, "request_id": str(uuid4()), "input": "Say hello"}
+    if provider == "anthropic":
+        assert client.post(url, headers=owner, json=body).status_code == 503
+        config.anthropic_api_key = SecretStr("anthropic-test-only")
+    queued = client.post(url, headers=owner, json=body)
+    assert queued.status_code == 202, queued.text
+
+    async def process():
+        repo = client.app.state.executions
+        run = await repo.claim()
+        assert run["snapshot"]["model_settings"]["provider"] == provider
+        await LangChainRuntime(
+            repo,
+            client.app.state.tools,
+            config,
+            lambda _: ScriptedModel(responses=[AIMessage(content="Hello")]),
+        ).execute(run)
+
+    client.portal.call(process)
+    result = client.get(
+        f"/api/v1/projects/{project}/executions/{queued.json()['id']}", headers=owner
+    ).json()
+    assert result["status"] == "completed" and result["final_answer"] == "Hello"

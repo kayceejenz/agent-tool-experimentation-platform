@@ -3,7 +3,7 @@ from uuid import UUID
 
 from api.dependencies import Agents, Config, Executions, User
 from fastapi import APIRouter, Query
-from integrations.agents.model_provider import provider_key
+from integrations.agents.model_provider import SUPPORTED_PROVIDERS, provider_key
 
 from modules.agents.models.error_model import AgentError
 from modules.executions.dtos.execution_dto import StartExecution
@@ -23,12 +23,16 @@ async def start(
 ):
     agent = await agents.get(user.id, project_id, agent_id, body.revision)
     provider = agent["model_settings"]["provider"].lower()
-    if provider not in ("openai", "google"):
-        raise AgentError(422, "The runtime supports OpenAI and Google providers")
-    if provider_key(config, provider) is None:
-        variable = (
-            "AGENT_GOOGLE_API_KEY" if provider == "google" else "AGENT_OPENAI_API_KEY"
+    if provider not in SUPPORTED_PROVIDERS:
+        raise AgentError(
+            422, "The runtime supports OpenAI, Google, Anthropic and Ollama"
         )
+    if provider_key(config, provider) is None:
+        variable = {
+            "google": "AGENT_GOOGLE_API_KEY",
+            "openai": "AGENT_OPENAI_API_KEY",
+            "anthropic": "AGENT_ANTHROPIC_API_KEY",
+        }[provider]
         raise AgentError(503, f"Set {variable} on the server to run this agent")
     result = await executions.start(user.id, project_id, agent_id, body)
     return {"id": result["id"], "status": result["status"]}

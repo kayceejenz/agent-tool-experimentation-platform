@@ -134,7 +134,9 @@ class ProjectRepository:
                         JOIN agent_platform.agent_executions e ON e.id=j.execution_id
                         WHERE e.project_id=%s AND j.finished_at IS NOT NULL AND j.started_at IS NOT NULL
                     ), buckets AS (
-                        SELECT *, input_tokens>200000 AS long_context,
+                        SELECT *, input_tokens > CASE
+                            WHEN lower(provider)='anthropic' AND model='claude-haiku-5-5' THEN 100000
+                            ELSE 200000 END AS long_context,
                             CASE WHEN (recorded_at AT TIME ZONE 'Europe/London')::date >= %s
                                 THEN (recorded_at AT TIME ZONE 'Europe/London')::date END AS day
                         FROM records

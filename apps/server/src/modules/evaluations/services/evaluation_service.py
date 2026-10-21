@@ -155,7 +155,13 @@ class Evaluator:
             )
         )
         judge = model.with_structured_output(
-            schema, method="json_schema", strict=True, include_raw=True
+            schema,
+            include_raw=True,
+            **(
+                {"method": "function_calling"}
+                if provider in ("anthropic", "ollama")
+                else {"method": "json_schema", "strict": True}
+            ),
         )
         with tracing_context(enabled=False):
             async with asyncio.timeout(profile["timeout_seconds"]):

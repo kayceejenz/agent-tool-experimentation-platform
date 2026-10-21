@@ -22,6 +22,11 @@ async def save_example(
     return await benchmarks.save(user.id, project_id, body)
 
 
+@router.get("/performance")
+async def performance(project_id: UUID, user: User, benchmarks: Benchmarks):
+    return await benchmarks.performance(user.id, project_id)
+
+
 @router.get("/captures/{capture_id}")
 async def capture(
     project_id: UUID, capture_id: UUID, user: User, benchmarks: Benchmarks
@@ -32,3 +37,17 @@ async def capture(
 @router.get("/runs/{execution_id}")
 async def run(project_id: UUID, execution_id: UUID, user: User, benchmarks: Benchmarks):
     return await benchmarks.run(user.id, project_id, execution_id)
+
+
+@router.get("/{benchmark_id}/runs")
+async def history(
+    project_id: UUID, benchmark_id: UUID, user: User, benchmarks: Benchmarks
+):
+    return await benchmarks.history(user.id, project_id, benchmark_id)
+
+
+@router.delete("/{benchmark_id}")
+async def delete(
+    project_id: UUID, benchmark_id: UUID, user: User, benchmarks: Benchmarks
+):
+    return await benchmarks.delete(user.id, project_id, benchmark_id)

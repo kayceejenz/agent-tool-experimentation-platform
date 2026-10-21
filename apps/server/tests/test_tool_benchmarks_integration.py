@@ -176,6 +176,18 @@ def test_manual_reference_normal_execution_comparison_and_access(
         "arguments": 0,
     }
     assert wrong["items"][0]["execution_id"] == again.json()["id"]
+    assert wrong["items"][0]["run_count"] == 2
+    history_url = benchmark_url + f"/{benchmark['id']}/runs"
+    history = client.get(history_url, headers=viewer)
+    assert history.status_code == 200
+    runs = history.json()["runs"]
+    assert [r["execution_id"] for r in runs] == [again.json()["id"], run_id]
+    assert runs[0]["score"]["arguments_correct"] is False
+    assert runs[1]["score"]["arguments_correct"] is True
+    assert runs[0]["latency_ms"] >= 0
+    assert runs[1]["latency_ms"] >= 0
+    assert runs[0]["model_settings"]["model"]
+    assert client.get(history_url, headers=outsider).status_code == 404
     # Direct run pages retain their original score after a newer run replaces the list entry.
     assert (
         client.get(detail_url, headers=viewer).json()["score"]["arguments_correct"]
@@ -188,6 +200,34 @@ def test_manual_reference_normal_execution_comparison_and_access(
     assert client.get(benchmark_url, headers=outsider).status_code == 404
     assert (
         client.get(benchmark_url + f"?agent_id={uuid4()}", headers=owner).status_code
+        == 404
+    )
+
+    performance_url = benchmark_url + "/performance"
+    performance = client.get(performance_url, headers=viewer)
+    assert performance.status_code == 200
+    model = performance.json()["items"][0]
+    assert model["agent_name"] == agent["name"]
+    assert model["runs"] == 2
+    assert model["questions"] == 1
+    assert model["argument_accuracy"] == 50
+    assert model["recall"] == 100
+    assert model["completion_rate"] == 100
+    assert model["latency_ms"] >= 0
+    assert client.get(performance_url, headers=outsider).status_code == 404
+    delete_url = benchmark_url + f"/{benchmark['id']}"
+    assert client.delete(delete_url, headers=viewer).status_code == 403
+    assert client.delete(delete_url, headers=outsider).status_code == 404
+    assert client.delete(delete_url, headers=owner).json() == {"deleted": True}
+    assert client.delete(delete_url, headers=owner).status_code == 200
+    assert client.get(benchmark_url, headers=owner).json()["items"] == []
+    assert client.get(history_url, headers=owner).status_code == 404
+    assert client.get(performance_url, headers=owner).json()["items"] == []
+    assert client.get(detail_url, headers=owner).status_code == 200
+    assert (
+        client.post(
+            run_url, headers=owner, json={**run_body, "request_id": str(uuid4())}
+        ).status_code
         == 404
     )
 

@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react';
 import { AccountMenu } from '@/components/auth/account-menu';
 import type { AuthUser } from '@/lib/auth/shared';
 import { WorkspaceNavigation } from '@/components/navigation/workspace-navigation';
+import { WorkspaceBreadcrumbs } from '@/components/navigation/workspace-breadcrumbs';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 
 export function AppShell({
@@ -76,6 +77,7 @@ export function AppShell({
 				id='workspace'
 				className='workspace'
 				tabIndex={-1}>
+				<WorkspaceBreadcrumbs />
 				{children}
 			</main>
 		</div>

@@ -7,9 +7,14 @@ from decimal import Decimal
 # Standard paid USD per million text tokens. Verified against provider pricing.
 # https://developers.openai.com/api/docs/models/gpt-4o-mini (and GPT-4.1 models)
 # https://ai.google.dev/gemini-api/docs/pricing
+# https://platform.claude.com/docs/en/models/haiku-5-5/overview
 # Cached-input discounts, free tiers and billing adjustments are not recorded.
 PRICING_DATE = "2026-10-12"
 RATES = {
+    ("openai", "gpt-4.1-nano"): ("0.10", "0.40"),
+    ("anthropic", "claude-haiku-5-5"): ("0.10", "0.50"),
+    ("anthropic", "claude-haiku-4-5-20251001"): ("1", "5"),
+    ("anthropic", "claude-haiku-4-5"): ("1", "5"),
     ("openai", "gpt-4o-mini"): ("0.15", "0.60"),
     ("openai", "gpt-4.1-mini"): ("0.40", "1.60"),
     ("openai", "gpt-4.1"): ("2", "8"),
@@ -49,6 +54,13 @@ def usage_summary(rows, today: date):
             and row["long_context"]
         ):
             rates = ("2.50", "15")
+        if (
+            rates
+            and row["provider"] == "anthropic"
+            and model == "claude-haiku-5-5"
+            and row["long_context"]
+        ):
+            rates = ("0.50", "2.50")
         inputs, outputs = int(row["input_tokens"]), int(row["output_tokens"])
         cost = (
             (inputs * Decimal(rates[0]) + outputs * Decimal(rates[1])) / 1_000_000
