@@ -30,7 +30,7 @@ def test_provider_credentials_are_isolated_and_missing_keys_do_not_fallback():
     assert redact({"message": "google-fixture"}, secrets) == {"message": "[redacted]"}
 
 
-def test_google_runtime_uses_compatibility_endpoint_and_google_key():
+def test_google_runtime_uses_native_adapter_and_google_key():
     settings = Settings(_env_file=None, google_api_key="google-fixture")
     model = LangChainRuntime(None, None, settings).model(
         {
@@ -42,10 +42,13 @@ def test_google_runtime_uses_compatibility_endpoint_and_google_key():
             "limits": {"max_output_tokens": 2048, "timeout_seconds": 60},
         }
     )
-    assert model.openai_api_base == GOOGLE_BASE_URL
-    assert model.openai_api_key.get_secret_value() == "google-fixture"
-    assert model.use_responses_api is False
-    assert "parallel_tool_calls" not in model.model_kwargs
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
+    assert isinstance(model, ChatGoogleGenerativeAI)
+    assert model.google_api_key.get_secret_value() == "google-fixture"
+    assert model.max_output_tokens == 2048
+    assert model.timeout == 60
+    assert model.max_retries == 0
 
 
 @pytest.mark.parametrize(
@@ -211,3 +214,94 @@ def test_invalid_ollama_urls_are_rejected(url):
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None, ollama_base_url=url)
+
+
+def test_native_gemini_preserves_signature_in_agent_tool_loop(monkeypatch):
+    import asyncio
+    from google.genai import types
+    from langchain.agents import create_agent
+    from langchain_core.tools import StructuredTool
+
+    settings = Settings(_env_file=None, google_api_key="google-fixture")
+    model = LangChainRuntime(None, None, settings).model(
+        {
+            "model_settings": {"provider": "google", "model": "gemini-3.5-flash-lite"},
+            "limits": {"max_output_tokens": 4096, "timeout_seconds": 60},
+        }
+    )
+    requests = []
+    signature = b"opaque-test-signature"
+
+    async def generate(**request):
+        requests.append(request)
+        if len(requests) == 1:
+            return types.GenerateContentResponse(
+                candidates=[
+                    types.Candidate(
+                        content=types.Content(
+                            role="model",
+                            parts=[
+                                types.Part(
+                                    function_call=types.FunctionCall(
+                                        name="search_products", args={"limit": 5}
+                                    ),
+                                    thought_signature=signature,
+                                )
+                            ],
+                        ),
+                        finish_reason="STOP",
+                    )
+                ],
+                usage_metadata=types.GenerateContentResponseUsageMetadata(
+                    prompt_token_count=10,
+                    candidates_token_count=5,
+                    total_token_count=15,
+                ),
+            )
+        parts = [part for content in request["contents"] for part in content.parts]
+        assert any(
+            part.function_call and part.thought_signature == signature for part in parts
+        )
+        assert any(part.function_response for part in parts)
+        return types.GenerateContentResponse(
+            candidates=[
+                types.Candidate(
+                    content=types.Content(
+                        role="model", parts=[types.Part(text="Products found.")]
+                    ),
+                    finish_reason="STOP",
+                )
+            ]
+        )
+
+    monkeypatch.setattr(model.async_client.models, "generate_content", generate)
+
+    async def search_products(limit: int):
+        """Search products."""
+        return {"items": [], "limit": limit}
+
+    agent = create_agent(
+        model, tools=[StructuredTool.from_function(coroutine=search_products)]
+    )
+    result = asyncio.run(
+        agent.ainvoke(
+            {"messages": [{"role": "user", "content": "Find five products."}]}
+        )
+    )
+    assert result["messages"][-1].content
+    assert len(requests) == 2
+    assert result["messages"][1].usage_metadata["input_tokens"] == 10
+
+
+def test_native_google_failure_retains_safe_status_and_hides_provider_text():
+    from google.genai.errors import ClientError
+    from langchain_google_genai.chat_models import GoogleInvalidRequestError
+    from integrations.agents.runtime_errors import model_failure
+
+    cause = ClientError(400, {"error": {"message": "private request content"}})
+    error = GoogleInvalidRequestError("private request content")
+    error.__cause__ = cause
+    category, details = model_failure(error)
+    assert category == "invalid_model_request"
+    assert details["http_status"] == 400
+    assert "private" not in str(details)

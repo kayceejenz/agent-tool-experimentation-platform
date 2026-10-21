@@ -11,6 +11,9 @@ from decimal import Decimal
 # Cached-input discounts, free tiers and billing adjustments are not recorded.
 PRICING_DATE = "2026-10-12"
 RATES = {
+    ("google", "gemini-3.5-flash-lite"): ("0.30", "2.50"),
+    # Introductory standard rates through 2026-12-31.
+    ("google", "gemini-3.8-flash"): ("0.75", "3.75"),
     ("openai", "gpt-4.1-nano"): ("0.10", "0.40"),
     ("anthropic", "claude-haiku-5-5"): ("0.10", "0.50"),
     ("anthropic", "claude-haiku-4-5-20251001"): ("1", "5"),

@@ -5,6 +5,16 @@ export const providerLabels = {
 	ollama: 'Ollama (local)',
 };
 export const modelCatalog = [
+    {
+        id: 'gemini-3.5-flash-lite', provider: 'google', name: 'Gemini 3.5 Flash-Lite',
+        tier: 'Budget', performance: 'Small-model baseline · replacement for 2.5 Flash-Lite',
+        input: 0.3, output: 2.5,
+    },
+    {
+        id: 'gemini-3.8-flash', provider: 'google', name: 'Gemini 3.8 Flash',
+        tier: 'Balanced', performance: 'Tool use · introductory pricing through December 2026',
+        input: 0.75, output: 3.75,
+    },
 	{
 		id: 'gpt-4.1-nano',
 		provider: 'openai',
@@ -88,24 +98,6 @@ export const modelCatalog = [
 		performance: 'Complex instructions and coding',
 		input: 2,
 		output: 8,
-	},
-	{
-		id: 'gemini-2.5-flash-lite',
-		provider: 'google',
-		name: 'Gemini 2.5 Flash-Lite',
-		tier: 'Budget',
-		performance: 'Fast · high-volume tasks',
-		input: 0.1,
-		output: 0.4,
-	},
-	{
-		id: 'gemini-2.5-flash',
-		provider: 'google',
-		name: 'Gemini 2.5 Flash',
-		tier: 'Balanced',
-		performance: 'Speed and reasoning balance',
-		input: 0.3,
-		output: 2.5,
 	},
 	{
 		id: 'gemini-2.5-pro',

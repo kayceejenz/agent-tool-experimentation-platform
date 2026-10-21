@@ -10,6 +10,11 @@ class RuntimeStop(Exception):
 def model_failure(error):
     """Expose actionable categories without persisting provider exception text."""
     status = getattr(error, "status_code", None)
+    if not isinstance(status, int):
+        # Native Google errors use code, or wrap a GenAI exception as their cause.
+        status = getattr(error, "code", None)
+        if not isinstance(status, int):
+            status = getattr(getattr(error, "__cause__", None), "code", None)
     categories = {
         400: (
             "invalid_model_request",
@@ -17,7 +22,7 @@ def model_failure(error):
         ),
         401: (
             "provider_authentication",
-            "Check the server's OpenAI API key and restart the worker.",
+            "Check the server's provider API key and restart the worker.",
         ),
         403: (
             "provider_permission",
@@ -29,7 +34,7 @@ def model_failure(error):
         ),
         429: (
             "provider_rate_limit",
-            "Check OpenAI API billing, quota, and rate limits.",
+            "Check provider API billing, quota, and rate limits.",
         ),
     }
     category, hint = categories.get(
@@ -40,7 +45,7 @@ def model_failure(error):
     if isinstance(detail, dict) and detail.get("code") == "insufficient_quota":
         category, hint = (
             "provider_quota",
-            "Check OpenAI API billing and the project's spending limit.",
+            "Check provider API billing and the project's spending limit.",
         )
     if isinstance(status, int) and status >= 500:
         category, hint = (
@@ -50,7 +55,7 @@ def model_failure(error):
     if type(error).__name__ == "APIConnectionError":
         category, hint = (
             "provider_connection",
-            "Check the worker's connection to OpenAI.",
+            "Check the worker's connection to the model provider.",
         )
     if type(error).__name__ == "APITimeoutError":
         category, hint = "provider_timeout", "The provider request timed out."

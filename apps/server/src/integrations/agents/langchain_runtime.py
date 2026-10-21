@@ -5,6 +5,7 @@ import asyncio
 from langchain.agents import create_agent
 from langchain_core.tools import StructuredTool
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langsmith import tracing_context
 from modules.agents.models.error_model import AgentError
 
@@ -31,6 +32,19 @@ class LangChainRuntime:
             options = provider_options(self.settings, config["provider"].lower())
         except ValueError:
             raise RuntimeStop("provider_not_configured") from None
+        if config["provider"].lower() == "google":
+            # The native adapter preserves Gemini thought signatures between tool turns.
+            google_options = {
+                "model": config["model"],
+                "google_api_key": options["api_key"],
+                "vertexai": False,
+                "max_output_tokens": snapshot["limits"]["max_output_tokens"],
+                "max_retries": 0,
+                "timeout": snapshot["limits"]["timeout_seconds"],
+            }
+            if config.get("temperature") is not None:
+                google_options["temperature"] = config["temperature"]
+            return ChatGoogleGenerativeAI(**google_options)
         kwargs = {
             "model": config["model"],
             **options,
