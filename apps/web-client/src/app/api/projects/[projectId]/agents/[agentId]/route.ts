@@ -13,3 +13,11 @@ export async function PATCH(
 	const { projectId, agentId } = await context.params;
 	return agentRoute(request, projectId, agentId);
 }
+
+export async function DELETE(
+	request: Request,
+	context: { params: Promise<{ projectId: string; agentId: string }> },
+) {
+	const { projectId, agentId } = await context.params;
+	return agentRoute(request, projectId, agentId);
+}

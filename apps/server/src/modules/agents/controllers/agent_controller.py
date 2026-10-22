@@ -69,3 +69,8 @@ async def revision(
     agents: Agents,
 ):
     return await agents.get(user.id, project_id, agent_id, revision)
+
+
+@router.delete("/{agent_id}")
+async def remove(project_id: UUID, agent_id: UUID, user: User, agents: Agents):
+    return await agents.remove(user.id, project_id, agent_id)

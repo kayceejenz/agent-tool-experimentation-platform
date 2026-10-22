@@ -1,6 +1,6 @@
 import 'server-only';
 import { BODY_LIMITS } from '@/lib/http/request-body';
-import { json } from '@/lib/auth/server';
+import { checkOrigin, json } from '@/lib/auth/server';
 import { projectApi } from '@/lib/projects/server';
 import {
 	routeError,
@@ -31,6 +31,8 @@ export async function agentRoute(
 				if (incoming.has(key))
 					params.set(key, incoming.get(key)!);
 			path += `?${params}`;
+		} else if (request.method === 'DELETE') {
+            checkOrigin(request);
 		} else {
 			init.body = await readRouteJson(
 				request,
@@ -42,7 +44,7 @@ export async function agentRoute(
 			await projectApi(path, init, {
 				403: 'Your project role cannot edit agents.',
 				404: 'Agent not found or access removed.',
-				409: 'The agent changed or is not ready to enable. Resolve configuration issues or reload; your unsaved edits are retained.',
+				409: request.method === 'DELETE' ? 'Finish or cancel pending runs before removing this agent.' : 'The agent changed or is not ready to enable. Resolve configuration issues or reload; your unsaved edits are retained.',
 				422: 'Check field limits and select matching prompt and tool revisions from this project.',
 				503: 'Agents are temporarily unavailable. Your edits have been retained.',
 			}),

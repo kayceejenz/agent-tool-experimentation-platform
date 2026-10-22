@@ -187,4 +187,40 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 	await page.screenshot({
 		path: 'test-results/agent-prompts-mobile.png',
 	});
+	await dialog
+		.getByRole('button', { name: 'Back to agents', exact: true })
+		.click();
+	await page
+		.getByRole('button', {
+			name: 'Remove Commerce analyst',
+			exact: true,
+		})
+		.click();
+	const removeDialog = page.getByRole('dialog', {
+		name: 'Remove agent?',
+		exact: true,
+	});
+	await expect(removeDialog).toBeVisible();
+	await removeDialog
+		.getByRole('button', { name: 'Cancel', exact: true })
+		.click();
+	await expect(removeDialog).not.toBeVisible();
+	await expect(
+		page.getByRole('button', {
+			name: 'Remove Commerce analyst',
+			exact: true,
+		}),
+	).toBeFocused();
+	await page
+		.getByRole('button', {
+			name: 'Remove Commerce analyst',
+			exact: true,
+		})
+		.click();
+	await removeDialog
+		.getByRole('button', { name: 'Confirm remove', exact: true })
+		.click();
+	await expect(
+		page.getByRole('heading', { name: 'No agents yet' }),
+	).toBeVisible();
 });

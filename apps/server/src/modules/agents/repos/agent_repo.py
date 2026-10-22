@@ -33,7 +33,7 @@ class AgentRepository:
     async def agent(db, project_id, agent_id, lock=False):
         row = await (
             await db.execute(
-                "SELECT * FROM agent_platform.agents WHERE project_id=%s AND id=%s"
+                "SELECT * FROM agent_platform.agents WHERE project_id=%s AND id=%s AND removed_at IS NULL"
                 + (" FOR UPDATE" if lock else ""),
                 (project_id, agent_id),
             )
@@ -213,7 +213,7 @@ class AgentRepository:
                 rows = await (
                     await db.execute(
                         SUMMARY
-                        + " WHERE a.project_id=%s ORDER BY a.created_at DESC,a.id DESC LIMIT 21 OFFSET %s",
+                        + " WHERE a.project_id=%s AND a.removed_at IS NULL ORDER BY a.created_at DESC,a.id DESC LIMIT 21 OFFSET %s",
                         (project_id, offset),
                     )
                 ).fetchall()
@@ -307,3 +307,31 @@ class AgentRepository:
                     (body.enabled, agent_id),
                 )
                 return {**detail, "enabled": body.enabled}
+
+    async def remove(self, user_id, project_id, agent_id):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await self.member(db, user_id, project_id, True)
+                row = await (
+                    await db.execute(
+                        "SELECT id FROM agent_platform.agents WHERE id=%s AND project_id=%s FOR UPDATE",
+                        (agent_id, project_id),
+                    )
+                ).fetchone()
+                if not row:
+                    raise AgentError(404, "Agent not found")
+                pending = await (
+                    await db.execute(
+                        "SELECT id FROM agent_platform.agent_executions WHERE agent_id=%s AND status IN ('queued','running') LIMIT 1",
+                        (agent_id,),
+                    )
+                ).fetchone()
+                if pending:
+                    raise AgentError(
+                        409, "Finish or cancel pending runs before removing this agent"
+                    )
+                await db.execute(
+                    "UPDATE agent_platform.agents SET enabled=false,removed_at=COALESCE(removed_at,now()) WHERE id=%s",
+                    (agent_id,),
+                )
+                return {"removed": True}

@@ -50,6 +50,7 @@ export function Agents({ project }: { project: Project }) {
 				<AgentList
 					key={generation}
 					projectId={project.id}
+                    canRemove={project.role !== 'viewer'}
 					onSelect={agent =>
 						router.push(
 							`${base}/${agent.id}`,
@@ -68,10 +69,12 @@ export function Agents({ project }: { project: Project }) {
 
 function AgentList({
 	projectId,
+    canRemove,
 	onSelect,
 	onPlayground,
 }: {
 	projectId: string;
+    canRemove: boolean;
 	onSelect: (agent: AgentSummary, button: HTMLElement) => void;
 	onPlayground: (agent: AgentSummary, button: HTMLElement) => void;
 }) {
@@ -79,6 +82,26 @@ function AgentList({
 		[offset, setOffset] = useState<number | null>(null),
 		[loading, setLoading] = useState(true),
 		[error, setError] = useState('');
+    const [removeTarget, setRemoveTarget] = useState<AgentSummary | null>(null);
+    const [removing, setRemoving] = useState(false);
+    const [removeError, setRemoveError] = useState('');
+    const removeDialog = useRef<HTMLDialogElement>(null);
+    const removeButton = useRef<HTMLButtonElement | null>(null);
+    useEffect(() => {
+        if (removeTarget) removeDialog.current?.showModal();
+        else removeDialog.current?.close();
+    }, [removeTarget]);
+    async function removeAgent() {
+        if (!removeTarget || removing) return;
+        setRemoving(true);
+        try {
+            await projectRequest(`/${projectId}/agents/${removeTarget.id}`, { method: 'DELETE' });
+            setItems(items => items.filter(item => item.id !== removeTarget.id));
+            setOffset(value => value === null ? null : Math.max(0, value - 1));
+            setRemoveTarget(null);
+        } catch (e) { setRemoveError(e instanceof Error ? e.message : 'Unable to remove agent.'); }
+        finally { setRemoving(false); }
+    }
 	const active = useRef(true);
 	const base = `/${projectId}/agents`;
 	useEffect(() => {
@@ -219,7 +242,7 @@ function AgentList({
 													? 'Enabled'
 													: 'Disabled'}
 											</td>
-											<td data-label="Action">
+											<td data-label="Action"><div className="table-row-actions">
 												<button
 													className='button'
 													aria-label={`Manage ${agent.name}`}
@@ -242,6 +265,9 @@ function AgentList({
 													}>
 													Playground
 												</button>
+                                                {canRemove && <button className='button destructive' aria-label={`Remove ${agent.name}`} onClick={event => { removeButton.current = event.currentTarget; setRemoveError(''); setRemoveTarget(agent); }}>Remove</button>}
+                                            </div>
+
 											</td>
 										</tr>
 									),
@@ -261,6 +287,18 @@ function AgentList({
 					</button>
 				</div>
 			)}
+            <dialog ref={removeDialog} className='benchmark-run-dialog' aria-labelledby='remove-agent-title'
+                onCancel={event => { if (removing) event.preventDefault(); else setRemoveTarget(null); }}
+                onClose={() => { setRemoveTarget(null); if (removeButton.current?.isConnected) removeButton.current.focus(); }}>
+                <h2 id='remove-agent-title'>Remove agent?</h2>
+                <p>Remove <strong>{removeTarget?.name}</strong> from the agent list? Saved revisions, executions and benchmark results will be kept.</p>
+                {removeError && <p role='alert' className='project-error'>{removeError}</p>}
+                <div className='table-row-actions'>
+                    <button className='button' autoFocus disabled={removing} onClick={() => setRemoveTarget(null)}>Cancel</button>
+                    <button className='button destructive' disabled={removing} onClick={removeAgent}>{removing ? 'Removing…' : 'Confirm remove'}</button>
+                </div>
+            </dialog>
+
 		</>
 	);
 }
