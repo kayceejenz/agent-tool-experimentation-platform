@@ -118,6 +118,7 @@ test('save a manual reference and compare an agent without advanced configuratio
 	});
 	expect(second.status()).toBe(201);
 	const runs = new Map<string, string>();
+	const removedRuns = new Set<string>();
 	// Only model responses are substituted; backend integration tests exercise the actual runtime.
 	await page.route(
 		`**${base}/agents/${agent.id}/executions`,
@@ -180,6 +181,12 @@ test('save a manual reference and compare an agent without advanced configuratio
 		const original = references.find(
 			(item: { id: string }) => item.id === benchmarkId,
 		);
+		if (removedRuns.has(runs.get(original.id)!)) {
+			await route.fulfill({
+				json: { benchmark: original, runs: [] },
+			});
+			return;
+		}
 		const correct = original.input === 'Describe this store.';
 		await route.fulfill({
 			json: {
@@ -218,6 +225,11 @@ test('save a manual reference and compare an agent without advanced configuratio
 		const executionId = new URL(route.request().url()).pathname
 			.split('/')
 			.pop();
+		if (route.request().method() === 'DELETE') {
+			removedRuns.add(executionId!);
+			await route.fulfill({ json: { removed: true } });
+			return;
+		}
 		const original = references.find(
 			(item: { id: string }) =>
 				runs.get(item.id) === executionId,
@@ -625,6 +637,26 @@ test('save a manual reference and compare an agent without advanced configuratio
 	await first
 		.getByRole('link', { name: 'Manage: Describe this store.' })
 		.click();
+	await page
+		.getByRole('button', { name: 'Remove run', exact: true })
+		.click();
+	const removePopup = page.getByRole('dialog', {
+		name: 'Remove benchmark run?',
+	});
+	await expect(removePopup).toBeVisible();
+	await removePopup
+		.getByRole('button', { name: 'Cancel', exact: true })
+		.click();
+	await expect(removePopup).not.toBeVisible();
+	await page
+		.getByRole('button', { name: 'Remove run', exact: true })
+		.click();
+	await removePopup
+		.getByRole('button', { name: 'Confirm remove', exact: true })
+		.click();
+	await expect(
+		page.getByText('No runs yet.', { exact: true }),
+	).toBeVisible();
 	await page
 		.getByRole('button', { name: 'Delete question', exact: true })
 		.click();

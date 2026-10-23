@@ -41,7 +41,7 @@ async function route(request: Request, context: Context) {
 			!deletion &&
 			!performance) ||
 		(request.method === 'POST' && (capture || run || history)) ||
-		(request.method === 'DELETE' && !deletion)
+		(request.method === 'DELETE' && !deletion && !run)
 	)
 		return json({ error: 'Benchmark not found.' }, 404);
 	try {
@@ -74,7 +74,10 @@ async function route(request: Request, context: Context) {
 				init,
 				{
 					404: 'Benchmark or successful manual test not found in this project.',
-					409: 'This request was already used. Refresh before saving again.',
+					409:
+						request.method === 'DELETE'
+							? 'Wait for the run to finish or cancel it before removing it.'
+							: 'This request was already used. Refresh before saving again.',
 					422: 'Enter a question and select a successful manual tool test.',
 				},
 			),

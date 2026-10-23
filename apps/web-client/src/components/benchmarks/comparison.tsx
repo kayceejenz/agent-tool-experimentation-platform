@@ -26,6 +26,47 @@ export function BenchmarkComparison({
 	project: Project;
 	benchmarkId: string;
 }) {
+	const [removeTarget, setRemoveTarget] = useState<Run | null>(null);
+	const [removing, setRemoving] = useState(false);
+	const [removeError, setRemoveError] = useState('');
+	const removeDialog = useRef<HTMLDialogElement>(null);
+	const removeButton = useRef<HTMLButtonElement | null>(null);
+	useEffect(() => {
+		if (removeTarget) removeDialog.current?.showModal();
+		else removeDialog.current?.close();
+	}, [removeTarget]);
+	async function removeRun() {
+		if (!removeTarget || removing) return;
+		setRemoving(true);
+		try {
+			await projectRequest(
+				`/${project.id}/benchmarks/runs/${removeTarget.execution_id}`,
+				{ method: 'DELETE' },
+			);
+			setData(current =>
+				current
+					? {
+							...current,
+							runs: current.runs.filter(
+								run =>
+									run.execution_id !==
+									removeTarget.execution_id,
+							),
+						}
+					: current,
+			);
+			setRemoveTarget(null);
+			setRefresh(n => n + 1);
+		} catch (e) {
+			setRemoveError(
+				e instanceof Error
+					? e.message
+					: 'Unable to remove run.',
+			);
+		} finally {
+			setRemoving(false);
+		}
+	}
 	const router = useRouter();
 	const [deleting, setDeleting] = useState(false);
 	const [confirmDelete, setConfirmDelete] = useState(false);
@@ -97,7 +138,7 @@ export function BenchmarkComparison({
 					<div className={styles.actions}>
 						<button
 							ref={deleteButton}
-							className={`button ${styles.deleteButton}`}
+							className={`button destructive`}
 							disabled={
 								!data ||
 								deleting
@@ -340,12 +381,33 @@ export function BenchmarkComparison({
 													)}
 												</td>
 												<td data-label='Action'>
-													<Link
-														className='button'
-														href={`/projects/${project.id}/benchmarks/runs/${run.execution_id}`}>
-														View
-														run
-													</Link>
+													<div className='table-row-actions'>
+														<Link
+															className='button'
+															href={`/projects/${project.id}/benchmarks/runs/${run.execution_id}`}>
+															View
+														</Link>
+														{project.role !==
+															'viewer' && (
+															<button
+																className={`button destructive`}
+																disabled={pending(
+																	run,
+																)}
+																onClick={event => {
+																	removeButton.current =
+																		event.currentTarget;
+																	setRemoveError(
+																		'',
+																	);
+																	setRemoveTarget(
+																		run,
+																	);
+																}}>
+																Remove{' '}
+															</button>
+														)}
+													</div>
 												</td>
 											</tr>
 										);
@@ -356,6 +418,66 @@ export function BenchmarkComparison({
 					</div>
 				)}
 			</section>
+			<dialog
+				ref={removeDialog}
+				className='benchmark-run-dialog'
+				aria-labelledby='remove-run-title'
+				onCancel={event => {
+					if (removing) event.preventDefault();
+					else setRemoveTarget(null);
+				}}
+				onClose={() => {
+					setRemoveTarget(null);
+					if (removeButton.current?.isConnected)
+						removeButton.current.focus();
+					else runButton.current?.focus();
+				}}>
+				<h2 id='remove-run-title'>
+					Remove benchmark run?
+				</h2>
+				<p>
+					This run will be excluded from this
+					question’s results and Agent
+					performance. Its execution trace will
+					remain in the agent’s history.
+				</p>
+				{removeTarget && (
+					<p>
+						<strong>
+							{
+								removeTarget.agent_name
+							}
+						</strong>
+					</p>
+				)}
+				{removeError && (
+					<p
+						role='alert'
+						className='project-error'>
+						{removeError}
+					</p>
+				)}
+				<div className={styles.actions}>
+					<button
+						className='button'
+						autoFocus
+						disabled={removing}
+						onClick={() =>
+							setRemoveTarget(null)
+						}>
+						Cancel
+					</button>
+					<button
+						className={`button destructive`}
+						disabled={removing}
+						onClick={removeRun}>
+						{removing
+							? 'Removing…'
+							: 'Confirm remove'}
+					</button>
+				</div>
+			</dialog>
+
 			<dialog
 				ref={deleteDialog}
 				className='benchmark-run-dialog'
@@ -395,7 +517,7 @@ export function BenchmarkComparison({
 						Cancel
 					</button>
 					<button
-						className={`button ${styles.deleteButton}`}
+						className={`button destructive`}
 						disabled={deleting}
 						onClick={deleteQuestion}>
 						{deleting

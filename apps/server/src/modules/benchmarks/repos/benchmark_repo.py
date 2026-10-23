@@ -105,13 +105,13 @@ class BenchmarkRepository:
                         """SELECT b.*,e.id AS execution_id,e.status,e.termination_reason,
                               e.agent_revision,e.agent_id,e.agent_name,
                               (SELECT count(*) FROM agent_platform.agent_executions runs
-                               WHERE runs.benchmark_id=b.id AND runs.project_id=b.project_id) AS run_count
+                               WHERE runs.benchmark_id=b.id AND runs.project_id=b.project_id AND runs.benchmark_removed_at IS NULL) AS run_count
                        FROM agent_platform.tool_benchmarks b
                        LEFT JOIN LATERAL (
                         SELECT id,status,termination_reason,agent_revision,agent_id,
                                snapshot->>'name' AS agent_name
                         FROM agent_platform.agent_executions
-                        WHERE benchmark_id=b.id AND (%s::uuid IS NULL OR (agent_id=%s AND agent_revision=%s))
+                        WHERE benchmark_id=b.id AND benchmark_removed_at IS NULL AND (%s::uuid IS NULL OR (agent_id=%s AND agent_revision=%s))
                         ORDER BY created_at DESC,id DESC LIMIT 1
                        ) e ON true
                        WHERE b.project_id=%s AND b.deleted_at IS NULL ORDER BY b.created_at DESC,b.id DESC""",
@@ -164,7 +164,7 @@ class BenchmarkRepository:
                               e.final_answer
                        FROM agent_platform.agent_executions e
                        JOIN agent_platform.tool_benchmarks b ON b.id=e.benchmark_id
-                       WHERE e.id=%s AND e.project_id=%s AND b.project_id=%s""",
+                       WHERE e.id=%s AND e.project_id=%s AND b.project_id=%s AND e.benchmark_removed_at IS NULL""",
                         (execution_id, project_id, project_id),
                     )
                 ).fetchone()
@@ -187,7 +187,7 @@ class BenchmarkRepository:
                                    THEN greatest(0,extract(epoch FROM finished_at-started_at)*1000)::double precision
                               END AS latency_ms
                        FROM agent_platform.agent_executions
-                       WHERE benchmark_id=%s AND project_id=%s
+                       WHERE benchmark_id=%s AND project_id=%s AND benchmark_removed_at IS NULL
                        ORDER BY created_at DESC,id DESC""",
                         (benchmark_id, project_id),
                     )
@@ -233,9 +233,32 @@ class BenchmarkRepository:
                        FROM agent_platform.agent_executions e
                        JOIN agent_platform.tool_benchmarks b ON b.id=e.benchmark_id
                        JOIN agent_platform.tool_revisions r ON r.tool_id=b.tool_id AND r.revision=b.tool_revision
-                       WHERE e.project_id=%s AND b.project_id=%s AND b.deleted_at IS NULL
+                       WHERE e.project_id=%s AND b.project_id=%s AND b.deleted_at IS NULL AND e.benchmark_removed_at IS NULL
                          AND e.status NOT IN ('queued','running') ORDER BY e.created_at,e.id""",
                         (project_id, project_id),
                     )
                 ).fetchall()
                 return {"items": model_performance(rows)}
+
+    async def remove_run(self, user_id, project_id, execution_id):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await AgentRepository.member(db, user_id, project_id, True)
+                row = await (
+                    await db.execute(
+                        "SELECT status FROM agent_platform.agent_executions WHERE id=%s AND project_id=%s AND benchmark_id IS NOT NULL FOR UPDATE",
+                        (execution_id, project_id),
+                    )
+                ).fetchone()
+                if not row:
+                    raise AgentError(404, "Benchmark run not found")
+                if row["status"] in ("queued", "running"):
+                    raise AgentError(
+                        409,
+                        "Wait for the run to finish or cancel it before removing it",
+                    )
+                await db.execute(
+                    "UPDATE agent_platform.agent_executions SET benchmark_removed_at=COALESCE(benchmark_removed_at,now()) WHERE id=%s AND project_id=%s",
+                    (execution_id, project_id),
+                )
+                return {"removed": True}

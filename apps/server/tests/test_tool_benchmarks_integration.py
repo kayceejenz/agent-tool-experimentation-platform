@@ -78,6 +78,10 @@ def test_manual_reference_normal_execution_comparison_and_access(
     run = client.post(run_url, headers=owner, json=run_body)
     assert run.status_code == 202, run.text
     run_id = run.json()["id"]
+    assert (
+        client.delete(benchmark_url + f"/runs/{run_id}", headers=owner).status_code
+        == 409
+    )
     assert client.post(run_url, headers=owner, json=run_body).json()["id"] == run_id
     assert (
         client.post(
@@ -215,6 +219,24 @@ def test_manual_reference_normal_execution_comparison_and_access(
     assert model["completion_rate"] == 100
     assert model["latency_ms"] >= 0
     assert client.get(performance_url, headers=outsider).status_code == 404
+    remove_url = benchmark_url + f"/runs/{again.json()['id']}"
+    assert client.delete(remove_url, headers=viewer).status_code == 403
+    assert client.delete(remove_url, headers=outsider).status_code == 404
+    assert client.delete(remove_url, headers=owner).json() == {"removed": True}
+    assert client.delete(remove_url, headers=owner).status_code == 200
+    assert client.get(remove_url, headers=owner).status_code == 404
+    remaining = client.get(history_url, headers=viewer).json()["runs"]
+    assert [r["execution_id"] for r in remaining] == [run_id]
+    assert client.get(performance_url, headers=owner).json()["items"][0]["runs"] == 1
+    assert client.get(benchmark_url, headers=owner).json()["items"][0]["run_count"] == 1
+    assert (
+        query(
+            config,
+            "SELECT count(*) FROM agent_platform.agent_executions WHERE id=%s",
+            (again.json()["id"],),
+        )[0][0]
+        == 1
+    )
     delete_url = benchmark_url + f"/{benchmark['id']}"
     assert client.delete(delete_url, headers=viewer).status_code == 403
     assert client.delete(delete_url, headers=outsider).status_code == 404

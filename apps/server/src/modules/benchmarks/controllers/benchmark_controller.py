@@ -51,3 +51,10 @@ async def delete(
     project_id: UUID, benchmark_id: UUID, user: User, benchmarks: Benchmarks
 ):
     return await benchmarks.delete(user.id, project_id, benchmark_id)
+
+
+@router.delete("/runs/{execution_id}")
+async def remove_run(
+    project_id: UUID, execution_id: UUID, user: User, benchmarks: Benchmarks
+):
+    return await benchmarks.remove_run(user.id, project_id, execution_id)
