@@ -5,6 +5,7 @@ import { ProjectSync } from '@/components/projects/project-provider';
 import { projectRequest } from '@/lib/projects/client';
 import type { Project } from '@/types/workspace';
 import styles from './comparison.module.css';
+import chartStyles from './performance-chart.module.css';
 
 type Model = {
 	agent_id: string;
@@ -95,6 +96,8 @@ export function ModelPerformance({ project }: { project: Project }) {
 					</div>
 				) : (
 					<>
+                        <PerformanceChart items={items} />
+                        <h2>Performance breakdown</h2>
 						<div
 							className={`tool-table-wrap ${styles.wrap}`}
 							role='region'
@@ -259,4 +262,45 @@ export function ModelPerformance({ project }: { project: Project }) {
 			</section>
 		</>
 	);
+}
+
+const chartMetrics = {
+    recall: { label: 'Tool recall', unit: 'percent' },
+    precision: { label: 'Tool precision', unit: 'percent' },
+    argument_accuracy: { label: 'Argument accuracy', unit: 'percent' },
+    completion_rate: { label: 'Completion rate', unit: 'percent' },
+    latency_ms: { label: 'Average latency', unit: 'seconds' },
+} as const;
+type ChartMetric = keyof typeof chartMetrics;
+
+function PerformanceChart({ items }: { items: Model[] }) {
+    const [metric, setMetric] = useState<ChartMetric>('recall');
+    const selected = chartMetrics[metric];
+    const isLatency = metric === 'latency_ms';
+    const maximum = isLatency ? Math.max(1000, ...items.map(item => item.latency_ms ?? 0)) : 100;
+    const display = (value: number | null) => value === null ? 'No data' : isLatency ? `${(value / 1000).toFixed(2)} s` : percent(value);
+    return <section className={chartStyles.chart} aria-label='Agent performance chart'>
+        <div className={chartStyles.toolbar}>
+            <h2>Agent comparison</h2>
+            <label>Metric
+                <select aria-label='Metric' value={metric} onChange={event => setMetric(event.target.value as ChartMetric)}>
+                    {Object.entries(chartMetrics).map(([key, value]) => <option value={key} key={key}>{value.label}</option>)}
+                </select>
+            </label>
+        </div>
+        <p className={chartStyles.hint}>{isLatency ? 'Lower is faster. Queue wait is excluded.' : 'Higher is better. Scores range from 0% to 100%.'}</p>
+        <div className={chartStyles.axis} aria-hidden='true'><span>0{isLatency ? ' s' : '%'}</span><span>{isLatency ? `${(maximum / 2000).toFixed(1)} s` : '50%'}</span><span>{isLatency ? `${(maximum / 1000).toFixed(1)} s` : '100%'}</span></div>
+        <div className={chartStyles.rows}>
+            {items.map(item => {
+                const value = item[metric];
+                return <div key={item.agent_id} className={chartStyles.row} tabIndex={0} role='img' aria-label={`${item.agent_name}: ${selected.label} ${display(value)}`} title={`${item.agent_name}: ${selected.label} ${display(value)}`}>
+                    <span className={chartStyles.name}>{item.agent_name}</span>
+                    <div className={chartStyles.track} aria-hidden='true'>
+                        {value !== null && <span className={chartStyles.bar} style={{ width: `${Math.max(0, Math.min(100, value / maximum * 100))}%` }} />}
+                    </div>
+                    <span className={chartStyles.value}>{display(value)}</span>
+                </div>;
+            })}
+        </div>
+    </section>;
 }

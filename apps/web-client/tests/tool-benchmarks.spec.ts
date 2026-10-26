@@ -694,6 +694,30 @@ test('save a manual reference and compare an agent without advanced configuratio
 			})
 			.locator('[aria-current=page]'),
 	).toHaveText('Agent performance');
+	const chart = page.getByRole('region', {
+		name: 'Agent performance chart',
+	});
+	await expect(
+		chart.getByRole('img', { name: 'Baseline: Tool recall 66.7%' }),
+	).toBeVisible();
+	await chart
+		.getByLabel('Metric', { exact: true })
+		.selectOption('argument_accuracy');
+	await expect(
+		chart.getByRole('img', {
+			name: 'Baseline: Argument accuracy 75.0%',
+		}),
+	).toBeVisible();
+	await chart.getByRole('img').focus();
+	await expect(chart.getByRole('img')).toBeFocused();
+	await chart
+		.getByLabel('Metric', { exact: true })
+		.selectOption('latency_ms');
+	await expect(
+		chart.getByRole('img', {
+			name: 'Baseline: Average latency 1.25 s',
+		}),
+	).toBeVisible();
 	const performanceTable = page.getByRole('region', {
 		name: 'Agent performance comparison',
 	});
