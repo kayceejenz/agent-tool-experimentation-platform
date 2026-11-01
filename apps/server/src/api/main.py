@@ -29,6 +29,8 @@ from psycopg import Error as DatabaseError
 from psycopg_pool import PoolClosed, PoolTimeout, TooManyRequests
 from pydantic import BaseModel
 
+from modules.datasets.controllers.dataset_controller import router as datasets_router
+
 from api.bootstrap import configure_dependencies
 
 
@@ -59,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     instance.include_router(auth_router, prefix="/api/v1")
     instance.include_router(project_router, prefix="/api/v1")
     instance.include_router(mcp_router, prefix="/api/v1")
+    instance.include_router(datasets_router, prefix="/api/v1")
     instance.include_router(tools_router, prefix="/api/v1")
     instance.include_router(prompts_router, prefix="/api/v1")
     instance.include_router(benchmarks_router, prefix="/api/v1")

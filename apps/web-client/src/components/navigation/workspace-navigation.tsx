@@ -14,6 +14,7 @@ import {
 import { useProjects } from '@/components/projects/project-provider';
 
 const projectSections = [
+	{ label: 'Datasets', slug: 'datasets', icon: FileCode2 },
 	{ label: 'MCP Servers', slug: 'servers', icon: Server },
 	{ label: 'Tools', slug: 'tools', icon: Wrench },
 	{ label: 'Prompts', slug: 'prompts', icon: FileCode2 },

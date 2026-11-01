@@ -23,6 +23,7 @@ dependencies = [
   "langchain>=1,<2",
   "langchain-openai>=1,<2",
   "langchain-google-genai>=4,<5",
+  "python-multipart>=0.0.32",
 ]
 
 [project.scripts]

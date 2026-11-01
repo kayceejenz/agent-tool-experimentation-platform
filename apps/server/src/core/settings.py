@@ -21,6 +21,10 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
 
+    dataset_storage_root: str = "./var/datasets"
+    dataset_file_limit_bytes: int = Field(default=64 * 1024 * 1024, ge=1)
+    dataset_total_limit_bytes: int = Field(default=128 * 1024 * 1024, ge=1)
+
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8001, ge=1, le=65535)
     openai_api_key: SecretStr | None = None

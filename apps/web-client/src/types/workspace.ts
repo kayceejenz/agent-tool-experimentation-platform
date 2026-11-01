@@ -9,6 +9,7 @@ export type Project = {
 };
 
 export type Section =
+	| 'datasets'
 	| 'servers'
 	| 'tools'
 	| 'experiments'

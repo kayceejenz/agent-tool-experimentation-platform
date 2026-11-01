@@ -8,6 +8,8 @@ import { sections } from '@/lib/workspace';
 
 import type { Project, Section } from '@/types/workspace';
 
+const Datasets = dynamic(() => import('@/components/datasets/datasets').then(m => m.Datasets), { loading: () => <p role='status'>Loading datasets…</p> });
+
 const Benchmarks = dynamic(() => import('@/components/benchmarks/benchmarks').then(m => m.Benchmarks), { loading: () => <p role='status'>Loading benchmarks…</p> });
 
 const Agents = dynamic(
@@ -44,6 +46,7 @@ export function SectionView({
 	project: Project;
 	section: Section;
 }) {
+	if (section === 'datasets') return <Datasets key={project.id} project={project} />;
 	if (section === 'benchmarks') return <Benchmarks key={project.id} project={project} />;
 	if (section === 'agents')
 		return <Agents key={project.id} project={project} />;
