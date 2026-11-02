@@ -29,6 +29,7 @@ dependencies = [
 [project.scripts]
 agent-platform-api = "api.main:run"
 agent-platform-migrate = "migrations:main"
+agent-platform-sandbox = "integrations.sandbox.cli:main"
 agent-platform-worker = "modules.executions.services.worker:main"
 
 [tool.hatch.build.targets.wheel]
@@ -39,4 +40,4 @@ dev = ["pytest>=8,<10", "httpx>=0.28,<1.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["integration: requires AGENT_TEST_DATABASE_URL pointing to a dedicated test database"]
+markers = ["integration: requires AGENT_TEST_DATABASE_URL pointing to a dedicated test database", "sandbox: requires Docker and RUN_SANDBOX_TESTS=1"]

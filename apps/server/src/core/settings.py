@@ -21,6 +21,11 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
 
+    sandbox_storage_root: str = "./var/sandboxes"
+    sandbox_image: str = "agent-analysis:phase2"
+    sandbox_command_seconds: int = Field(default=60, ge=1, le=300)
+    sandbox_session_seconds: int = Field(default=300, ge=1, le=900)
+
     dataset_storage_root: str = "./var/datasets"
     dataset_file_limit_bytes: int = Field(default=64 * 1024 * 1024, ge=1)
     dataset_total_limit_bytes: int = Field(default=128 * 1024 * 1024, ge=1)
