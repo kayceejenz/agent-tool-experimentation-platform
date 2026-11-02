@@ -30,5 +30,5 @@ export default defineConfig([
       { group: ["@/lib/**/server", "@/lib/**/routes", "@/lib/http/project-route", "next/headers", "server-only"], message: "Shared browser hooks use client transport." },
     ] }] },
   },
-  globalIgnores([".next/**", "out/**", "next-env.d.ts"]),
+  globalIgnores([".next/**", ".next-dev/**", "out/**", "next-env.d.ts"]),
 ]);
