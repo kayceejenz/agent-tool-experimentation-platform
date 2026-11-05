@@ -1,14 +1,20 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from modules.evaluations.dtos.evaluation_dto import Expectations
+
+
+class AnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dataset_id: UUID
 
 
 class StartExecution(BaseModel):
     model_config = ConfigDict(extra="forbid")
     revision: int = Field(ge=1, strict=True)
     request_id: UUID
+    analysis: AnalysisRequest | None = None
     benchmark_id: UUID | None = None
     expectations: Expectations | None = None
     input: str = Field(min_length=1, max_length=16000)
@@ -19,3 +25,9 @@ class StartExecution(BaseModel):
         if not value.strip() or "\x00" in value:
             raise ValueError("Task required")
         return value.strip()
+
+    @model_validator(mode="after")
+    def analysis_is_not_benchmark(self):
+        if self.analysis and self.benchmark_id:
+            raise ValueError("Analysis runs cannot use tool benchmarks")
+        return self

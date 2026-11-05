@@ -3,20 +3,26 @@ import json
 from uuid import uuid4
 
 from core.serialization import json_value
+from core.settings import Settings
+from fastapi import HTTPException
 from integrations.agents.model_provider import SUPPORTED_PROVIDERS
+from integrations.agents.runtime_errors import RuntimeStop
+from integrations.sandbox.tools import TOOL_VERSION, image_identity, tool_definitions
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from modules.agents.models.error_model import AgentError
 from modules.agents.repos.agent_repo import AgentRepository
 from modules.benchmarks.repos.benchmark_repo import BenchmarkRepository
+from modules.datasets.repos.dataset_repo import DatasetRepository
 from modules.executions.helpers.snapshot import execution_snapshot
 from modules.tools.helpers.validation import redact, redact_text
 
 
 class ExecutionRepository:
-    def __init__(self, database, secret=None):
+    def __init__(self, database, secret=None, settings=None):
         self.database, self.secret = database, secret
+        self.settings = settings
 
     def redact_for_storage(self, value):
         return redact(json_value(value), self.secret)
@@ -32,6 +38,10 @@ class ExecutionRepository:
         )
         if body.benchmark_id:
             digest_input = json.dumps([digest_input, str(body.benchmark_id)])
+        if body.analysis:
+            digest_input = json.dumps(
+                [digest_input, body.analysis.model_dump(mode="json")], sort_keys=True
+            )
         digest = hashlib.sha256(digest_input.encode()).hexdigest()
         async with self.database.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as db:
@@ -94,7 +104,30 @@ class ExecutionRepository:
                         raise AgentError(
                             422, "Run the saved question without judge expectations"
                         )
+                if body.analysis:
+                    try:
+                        dataset = await DatasetRepository.read(
+                            db, project_id, body.analysis.dataset_id
+                        )
+                        identity = await image_identity(self.settings or Settings())
+                    except HTTPException:
+                        raise AgentError(
+                            404, "Dataset not found in this project"
+                        ) from None
+                    except RuntimeStop:
+                        raise AgentError(
+                            503,
+                            "Start Docker and build the analysis sandbox image before running",
+                        ) from None
+                    detail["analysis"] = {
+                        "dataset": json_value(dataset),
+                        "tool_version": TOOL_VERSION,
+                        "image_id": identity,
+                    }
+                    detail["builtin_tools"] = tool_definitions()
                 snapshot = execution_snapshot(detail, expectations, self.secret)
+                if body.analysis:
+                    snapshot["evaluation_profile"]["enabled"] = False
                 if body.benchmark_id:
                     snapshot["evaluation_profile"]["enabled"] = False
                 return await (
@@ -124,7 +157,7 @@ class ExecutionRepository:
                         (
                             "SELECT *"
                             if view == "full"
-                            else "SELECT id,agent_revision,status,termination_reason,final_answer,created_at,finished_at"
+                            else "SELECT id,agent_revision,status,termination_reason,final_answer,created_at,finished_at,snapshot#>>'{analysis,dataset,id}' AS analysis_dataset_id"
                             + (",input" if view == "summary" else "")
                         )
                         + " FROM agent_platform.agent_executions WHERE project_id=%s AND id=%s",
@@ -146,9 +179,35 @@ class ExecutionRepository:
                             (execution_id,),
                         )
                     ).fetchone()
+                    phase = None
+                    if row.get("analysis_dataset_id") and row["status"] == "running":
+                        latest = await (
+                            await db.execute(
+                                "SELECT kind,name FROM agent_platform.execution_spans WHERE execution_id=%s ORDER BY sequence DESC LIMIT 1",
+                                (execution_id,),
+                            )
+                        ).fetchone()
+                        phase = (
+                            "Preparing dataset and sandbox…"
+                            if not latest
+                            else (
+                                "Running Python analysis…"
+                                if latest["name"] == "Workspace / execute_python"
+                                else (
+                                    "Inspecting dataset files…"
+                                    if latest["kind"] == "tool"
+                                    else (
+                                        "Planning analysis…"
+                                        if counts["model_turns"] <= 1
+                                        else "Interpreting results and preparing the answer…"
+                                    )
+                                )
+                            )
+                        )
                     return {
                         **row,
                         **counts,
+                        "analysis_phase": phase,
                         "failure_hint": hint["hint"] if hint else None,
                     }
                 row.pop("input_hash", None)
@@ -295,6 +354,27 @@ class ExecutionRepository:
                     redact_text(content, self.secret),
                     span_id,
                 ),
+            )
+
+    async def analysis_details(self, user_id, project_id, run_id):
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                await AgentRepository.member(db, user_id, project_id)
+                row = await (
+                    await db.execute(
+                        "SELECT status,created_at,finished_at,snapshot->'analysis_result' AS analysis_result FROM agent_platform.agent_executions WHERE id=%s AND project_id=%s",
+                        (run_id, project_id),
+                    )
+                ).fetchone()
+                if not row:
+                    raise AgentError(404, "Execution not found")
+                return row
+
+    async def record_analysis_result(self, run_id, result):
+        async with self.database.connection() as conn:
+            await conn.execute(
+                "UPDATE agent_platform.agent_executions SET snapshot=jsonb_set(snapshot,'{analysis_result}',%s) WHERE id=%s AND status='running'",
+                (Jsonb(json_value(result)), run_id),
             )
 
     async def finish(self, run_id, status, reason, answer=None):

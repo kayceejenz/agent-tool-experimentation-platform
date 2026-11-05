@@ -4,8 +4,8 @@ import asyncio
 
 from langchain.agents import create_agent
 from langchain_core.tools import StructuredTool
-from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langsmith import tracing_context
 from modules.agents.models.error_model import AgentError
 
@@ -13,6 +13,7 @@ from integrations.agents.execution_middleware import ExecutionMiddleware
 from integrations.agents.model_provider import configured_secrets, provider_options
 from integrations.agents.runtime_errors import RuntimeStop
 from integrations.agents.runtime_messages import runtime_instructions, visible_text
+from integrations.sandbox.tools import WorkspaceTools
 
 
 async def blocked_dispatch(**kwargs):
@@ -56,52 +57,57 @@ class LangChainRuntime:
             kwargs["temperature"] = config["temperature"]
         return ChatOpenAI(
             **kwargs,
-            model_kwargs={"parallel_tool_calls": False}
-            if config["provider"].lower() == "openai"
-            else {},
+            model_kwargs=(
+                {"parallel_tool_calls": False}
+                if config["provider"].lower() == "openai"
+                else {}
+            ),
         )
+
+    async def invoke(self, run, workspace):
+        snapshot = run["snapshot"]
+        middleware = ExecutionMiddleware(
+            run,
+            self.repository,
+            self.executor,
+            configured_secrets(self.settings),
+            workspace=workspace,
+        )
+        tools = [
+            StructuredTool(
+                name=tool["alias"],
+                description=f"{tool['server_name']}: {tool['name']}. "
+                + (tool["definition"].get("description") or ""),
+                args_schema=tool["definition"]["input_schema"],
+                coroutine=blocked_dispatch,
+            )
+            for tool in [*snapshot["tools"], *snapshot.get("builtin_tools", [])]
+        ]
+        agent = create_agent(
+            self.model(snapshot),
+            tools=tools,
+            system_prompt=snapshot.get("runtime_instructions")
+            or runtime_instructions(snapshot),
+            middleware=[middleware],
+        )
+        with tracing_context(enabled=False):
+            result = await agent.ainvoke(
+                {"messages": [{"role": "user", "content": run["input"]}]},
+                config={"recursion_limit": 2 * snapshot["limits"]["max_turns"] + 10},
+            )
+        await middleware.check()
+        return visible_text(result["messages"][-1])
 
     async def execute(self, run):
         status, reason, answer = "failed", "runtime_error", None
+        workspace = None
         try:
-            snapshot = run["snapshot"]
-            middleware = ExecutionMiddleware(
-                run,
-                self.repository,
-                self.executor,
-                configured_secrets(self.settings),
-            )
-            tools = [
-                StructuredTool(
-                    name=tool["alias"],
-                    description=f"{tool['server_name']}: {tool['name']}. "
-                    + (tool["definition"].get("description") or ""),
-                    args_schema=tool["definition"]["input_schema"],
-                    coroutine=blocked_dispatch,
-                )
-                for tool in snapshot["tools"]
-            ]
-            instructions = snapshot.get("runtime_instructions") or runtime_instructions(
-                snapshot
-            )
-            agent = create_agent(
-                self.model(snapshot),
-                tools=tools,
-                system_prompt=instructions,
-                middleware=[middleware],
-            )
-            with tracing_context(enabled=False):
-                async with asyncio.timeout(snapshot["limits"]["timeout_seconds"]):
-                    result = await agent.ainvoke(
-                        {"messages": [{"role": "user", "content": run["input"]}]},
-                        config={
-                            "recursion_limit": 2 * snapshot["limits"]["max_turns"] + 10
-                        },
-                    )
-            await middleware.check()
-            message = result["messages"][-1]
-            answer = visible_text(message)
-            status, reason = "completed", "final_answer"
+            async with asyncio.timeout(run["snapshot"]["limits"]["timeout_seconds"]):
+                if run["snapshot"].get("analysis"):
+                    workspace = WorkspaceTools(run, self.repository, self.settings)
+                    await workspace.prepare()
+                answer = await self.invoke(run, workspace)
+                status, reason = "completed", "final_answer"
         except RuntimeStop as error:
             reason = error.reason
             status = "cancelled" if reason == "cancelled" else "failed"
@@ -121,4 +127,12 @@ class LangChainRuntime:
         except Exception:
             # Provider exceptions can contain request data or credentials.
             reason = "runtime_error"
+        finally:
+            if workspace:
+                try:
+                    await workspace.finish(collect=status == "completed")
+                except RuntimeStop as error:
+                    status, reason = "failed", error.reason
+                except Exception:
+                    status, reason = "failed", "sandbox_cleanup_failed"
         await self.repository.finish(run["id"], status, reason, answer)

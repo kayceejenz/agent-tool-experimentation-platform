@@ -21,6 +21,8 @@ export function AgentPlayground({
 	pageMode?: boolean;
 }) {
 	const {
+		datasetId,
+		updateDataset,
 		updateInput,
 		editTask,
 		refreshHistory,
@@ -146,6 +148,8 @@ export function AgentPlayground({
 					/>
 				) : !run ? (
 					<PlaygroundComposer
+						datasetId={datasetId}
+						updateDataset={updateDataset}
 						projectId={projectId}
 						input={input}
 						busy={busy}

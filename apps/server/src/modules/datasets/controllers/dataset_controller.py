@@ -111,3 +111,16 @@ async def preview(
     if not any(f["id"] == file_id for f in dataset["files"]):
         raise HTTPException(404, "Dataset file not found")
     return await asyncio.to_thread(storage.preview, dataset_id, file_id)
+
+
+@router.delete("/{dataset_id}")
+async def delete_dataset(
+    project_id: UUID, dataset_id: UUID, request: Request, user: User, config: Config
+):
+    repo, storage = resources(request, config)
+
+    async def remove_files():
+        await asyncio.to_thread(storage.remove, dataset_id, strict=True)
+
+    await repo.delete(user.id, project_id, dataset_id, remove_files)
+    return {"deleted": True}

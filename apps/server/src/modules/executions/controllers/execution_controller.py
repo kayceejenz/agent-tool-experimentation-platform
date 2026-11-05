@@ -1,8 +1,12 @@
+import asyncio
+from pathlib import Path
+from urllib.parse import quote
 from typing import Annotated, Literal
 from uuid import UUID
 
 from api.dependencies import Agents, Config, Executions, User
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
+from integrations.sandbox.artifacts import ArtifactStorage
 from integrations.agents.model_provider import SUPPORTED_PROVIDERS, provider_key
 
 from modules.agents.models.error_model import AgentError
@@ -98,3 +102,56 @@ async def snapshot(
     project_id: UUID, execution_id: UUID, user: User, executions: Executions
 ):
     return await executions.trace(user.id, project_id, execution_id, snapshot=True)
+
+
+@router.get("/executions/{execution_id}/artifacts")
+async def artifacts(
+    project_id: UUID,
+    execution_id: UUID,
+    user: User,
+    executions: Executions,
+    config: Config,
+):
+    record = await executions.analysis_details(user.id, project_id, execution_id)
+    return await asyncio.to_thread(ArtifactStorage(config).listing, record)
+
+
+@router.get("/executions/{execution_id}/artifacts/{artifact_id}/preview")
+async def artifact_preview(
+    project_id: UUID,
+    execution_id: UUID,
+    artifact_id: str,
+    user: User,
+    executions: Executions,
+    config: Config,
+):
+    record = await executions.analysis_details(user.id, project_id, execution_id)
+    return await asyncio.to_thread(ArtifactStorage(config).preview, record, artifact_id)
+
+
+@router.get("/executions/{execution_id}/artifacts/{artifact_id}")
+async def artifact_download(
+    project_id: UUID,
+    execution_id: UUID,
+    artifact_id: str,
+    user: User,
+    executions: Executions,
+    config: Config,
+    inline: bool = False,
+):
+    record = await executions.analysis_details(user.id, project_id, execution_id)
+    item, data, media_type = await asyncio.to_thread(
+        ArtifactStorage(config).read, record, artifact_id
+    )
+    name = Path(item["name"]).name
+    disposition = "inline" if inline and media_type == "image/png" else "attachment"
+    return Response(
+        data,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f"{disposition}; filename=analysis-output{Path(artifact_id).suffix}; filename*=UTF-8''{quote(name, safe='')}",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+    )

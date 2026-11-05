@@ -12,24 +12,6 @@
 .agent-tabs {
 	flex-wrap: wrap;
 }
-.agent-wizard-steps {
-	display: flex;
-	flex-direction: row;
-	flex-wrap: nowrap;
-	gap: 8px;
-	margin: 20px 0;
-	align-items: stretch;
-	overflow-x: auto;
-}
-.agent-wizard-steps .button {
-	flex: 1 0 auto;
-	white-space: nowrap;
-	text-align: center;
-}
-.agent-wizard-steps [aria-pressed='true'] {
-	border-color: var(--accent);
-	color: var(--accent);
-}
 .agent-section {
 	padding: 18px 0;
 	border-bottom: 1px solid var(--line);

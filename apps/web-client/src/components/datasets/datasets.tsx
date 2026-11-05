@@ -92,8 +92,7 @@ function Popup({
 			onCancel={event => {
 				event.preventDefault();
 				if (!busy) onClose();
-			}}
-		>
+			}}>
 			<header className={styles.modalHeader}>
 				<h2 id={titleId}>{title}</h2>
 				<button className='button' disabled={busy} onClick={onClose}>
@@ -133,6 +132,8 @@ export function Datasets({ project }: { project: Project }) {
 	const [moreLoading, setMoreLoading] = useState(false);
 	const [generation, setGeneration] = useState(0);
 	const [uploadOpen, setUploadOpen] = useState(false);
+	const [deleting, setDeleting] = useState<Dataset | null>(null);
+	const [deleteError, setDeleteError] = useState('');
 	const [pending, setPending] = useState<File[]>([]);
 	const previewRequest = useRef(0);
 	const detailRequest = useRef(0);
@@ -331,6 +332,26 @@ export function Datasets({ project }: { project: Project }) {
 			setBusy(false);
 		}
 	}
+	async function deleteDataset() {
+		if (!deleting || busy) return;
+		setBusy(true);
+		setDeleteError('');
+		try {
+			await read(`${base}/${deleting.id}`, { method: 'DELETE' });
+			listRequest.current++;
+			if (selectedId === deleting.id) toggleDataset(deleting.id);
+			setItems(current => current.filter(item => item.id !== deleting.id));
+			setDeleting(null);
+			setNotice(`“${deleting.name}” deleted.`);
+			uploadButton.current?.focus();
+			refresh();
+		} catch (error) {
+			setDeleteError(message(error));
+		} finally {
+			setBusy(false);
+		}
+	}
+
 	async function loadMore() {
 		if (moreLoading) return;
 		const request = listRequest.current;
@@ -357,8 +378,7 @@ export function Datasets({ project }: { project: Project }) {
 		<div className={styles.workspace}>
 			<PageHeader
 				title='Datasets'
-				description='Keep related CSV files together and explore their source records.'
-			>
+				description='Keep related CSV files together and explore their source records.'>
 				{canEdit && (
 					<button
 						ref={uploadButton}
@@ -368,8 +388,7 @@ export function Datasets({ project }: { project: Project }) {
 						onClick={() => {
 							setUploadOpen(open => !open);
 						}}
-						disabled={busy}
-					>
+						disabled={busy}>
 						<Upload size={16} /> Upload dataset
 					</button>
 				)}
@@ -380,17 +399,52 @@ export function Datasets({ project }: { project: Project }) {
 					{notice}
 				</p>
 			)}
+			{canEdit && deleting && (
+				<Popup
+					title='Delete dataset'
+					busy={busy}
+					onClose={() => setDeleting(null)}>
+					<section className={styles.upload}>
+						<p>
+							Delete “{deleting.name}” and all its uploaded files? This cannot
+							be undone.
+						</p>
+						<p>
+							Completed analysis results will remain available. New analyses
+							will need a new upload.
+						</p>
+						{deleteError && (
+							<p role='alert' className={styles.error}>
+								{deleteError}
+							</p>
+						)}
+						<div className={styles.actions}>
+							<button
+								className={`button ${styles.deleteButton}`}
+								disabled={busy}
+								onClick={() => void deleteDataset()}>
+								{busy ? 'Deleting…' : 'Delete dataset'}
+							</button>
+							<button
+								className='button'
+								disabled={busy}
+								onClick={() => setDeleting(null)}>
+								Cancel
+							</button>
+						</div>
+					</section>
+				</Popup>
+			)}
+
 			{canEdit && uploadOpen && (
 				<Popup
 					title='Upload dataset'
 					busy={busy}
-					onClose={() => setUploadOpen(false)}
-				>
+					onClose={() => setUploadOpen(false)}>
 					<section
 						className={`panel ${styles.upload}`}
 						id='dataset-upload'
-						aria-labelledby='upload-title'
-					>
+						aria-labelledby='upload-title'>
 						<h2 id='upload-title'>New dataset</h2>
 						<p>Give related files a name, then upload them together.</p>
 						<form onSubmit={upload} aria-busy={busy}>
@@ -442,8 +496,7 @@ export function Datasets({ project }: { project: Project }) {
 														setPending(current =>
 															current.filter((_, i) => i !== index),
 														)
-													}
-												>
+													}>
 													Remove
 												</button>
 											</li>
@@ -459,8 +512,7 @@ export function Datasets({ project }: { project: Project }) {
 							<div className={styles.actions}>
 								<button
 									className='button primary'
-									disabled={busy || !pending.length}
-								>
+									disabled={busy || !pending.length}>
 									{busy ? 'Uploading files…' : 'Save dataset'}
 								</button>
 								<button
@@ -470,8 +522,7 @@ export function Datasets({ project }: { project: Project }) {
 									onClick={() => {
 										setUploadOpen(false);
 										uploadButton.current?.focus();
-									}}
-								>
+									}}>
 									Cancel
 								</button>
 								<small>
@@ -486,16 +537,14 @@ export function Datasets({ project }: { project: Project }) {
 			)}
 			<section
 				className={`panel ${styles.library}`}
-				aria-labelledby='library-title'
-			>
+				aria-labelledby='library-title'>
 				<div className={styles.heading}>
 					<h2 id='library-title'>Datasets</h2>
 					<button
 						className='button'
 						aria-label='Refresh datasets'
 						disabled={loading || moreLoading || busy}
-						onClick={refresh}
-					>
+						onClick={refresh}>
 						<RefreshCw size={16} />
 					</button>
 				</div>
@@ -523,8 +572,7 @@ export function Datasets({ project }: { project: Project }) {
 						{canEdit && (
 							<button
 								className='button primary'
-								onClick={() => setUploadOpen(true)}
-							>
+								onClick={() => setUploadOpen(true)}>
 								<Upload size={16} /> Add dataset
 							</button>
 						)}
@@ -534,8 +582,7 @@ export function Datasets({ project }: { project: Project }) {
 						className={styles.catalogue}
 						tabIndex={0}
 						role='region'
-						aria-label='Datasets and files'
-					>
+						aria-label='Datasets and files'>
 						<table>
 							<thead>
 								<tr>
@@ -552,15 +599,13 @@ export function Datasets({ project }: { project: Project }) {
 										<tr
 											className={
 												selectedId === item.id ? styles.activeRow : undefined
-											}
-										>
+											}>
 											<th scope='row'>
 												<button
 													className={styles.datasetName}
 													disabled={busy}
 													aria-expanded={selectedId === item.id}
-													onClick={() => toggleDataset(item.id)}
-												>
+													onClick={() => toggleDataset(item.id)}>
 													<ChevronRight
 														size={16}
 														className={
@@ -601,10 +646,21 @@ export function Datasets({ project }: { project: Project }) {
 													className='button'
 													disabled={busy}
 													onClick={() => toggleDataset(item.id)}
-													aria-label={`${selectedId === item.id ? 'Collapse' : 'Expand'} ${item.name}`}
-												>
+													aria-label={`${selectedId === item.id ? 'Collapse' : 'Expand'} ${item.name}`}>
 													{selectedId === item.id ? 'Collapse' : 'Expand'}
 												</button>
+												{canEdit && (
+													<button
+														className={`button ${styles.deleteButton}`}
+														disabled={busy}
+														aria-label={`Delete ${item.name}`}
+														onClick={() => {
+															setDeleteError('');
+															setDeleting(item);
+														}}>
+														Delete
+													</button>
+												)}
 											</td>
 										</tr>
 										{selectedId === item.id &&
@@ -621,8 +677,7 @@ export function Datasets({ project }: { project: Project }) {
 															{detailError}{' '}
 															<button
 																className='button'
-																onClick={() => void select(item.id)}
-															>
+																onClick={() => void select(item.id)}>
 																Retry
 															</button>
 														</div>
@@ -645,8 +700,7 @@ export function Datasets({ project }: { project: Project }) {
 															<button
 																className='button'
 																aria-label={`Preview ${entry.name}`}
-																onClick={() => void inspect(item.id, entry)}
-															>
+																onClick={() => void inspect(item.id, entry)}>
 																Preview
 															</button>
 														</td>
@@ -663,8 +717,7 @@ export function Datasets({ project }: { project: Project }) {
 					<button
 						className='button'
 						disabled={moreLoading || loading || busy}
-						onClick={() => void loadMore()}
-					>
+						onClick={() => void loadMore()}>
 						{moreLoading ? 'Loading…' : 'Load more datasets'}
 					</button>
 				)}
@@ -678,13 +731,11 @@ export function Datasets({ project }: { project: Project }) {
 						rememberView(base, selectedId);
 						setFile(null);
 						setPreview(null);
-					}}
-				>
+					}}>
 					<section
 						className={`panel ${styles.records}`}
 						aria-labelledby='preview-title'
-						aria-busy={previewLoading}
-					>
+						aria-busy={previewLoading}>
 						<div className={styles.heading}>
 							<div>
 								<h2 id='preview-title'>Preview: {file.name}</h2>
@@ -705,8 +756,7 @@ export function Datasets({ project }: { project: Project }) {
 								{previewError}{' '}
 								<button
 									className='button'
-									onClick={() => void inspect(detail!.id, file)}
-								>
+									onClick={() => void inspect(detail!.id, file)}>
 									Retry preview
 								</button>
 							</div>
@@ -717,8 +767,7 @@ export function Datasets({ project }: { project: Project }) {
 										className={styles.preview}
 										tabIndex={0}
 										role='region'
-										aria-label={`Scrollable records from ${file.name}`}
-									>
+										aria-label={`Scrollable records from ${file.name}`}>
 										<table>
 											<caption className={styles.visuallyHidden}>
 												First records from {file.name}
@@ -742,8 +791,7 @@ export function Datasets({ project }: { project: Project }) {
 																{cell || (
 																	<span
 																		className={styles.missing}
-																		aria-label='Empty value'
-																	>
+																		aria-label='Empty value'>
 																		—
 																	</span>
 																)}

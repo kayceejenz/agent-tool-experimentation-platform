@@ -17,9 +17,9 @@ export type ToolBinding = Reference & {
 };
 
 export type EvaluationProfile = {
-    enabled: boolean;
-    prompt: Reference | null;
-    model: string | null;
+	enabled: boolean;
+	prompt: Reference | null;
+	model: string | null;
 };
 
 export type AgentConfig = {
@@ -90,7 +90,7 @@ export const newAgent: AgentConfig = {
 	description: '',
 	system_prompt: null,
 	agent_prompt: null,
-	evaluation_profile: { enabled: true, prompt: null, model: null },
+	evaluation_profile: { enabled: false, prompt: null, model: null },
 	model_settings: { provider: '', model: '', temperature: null },
 	tools: [],
 	limits: {

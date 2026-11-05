@@ -24,14 +24,6 @@ export const tabs = [
 	'History',
 ] as const;
 
-export const wizardSteps = [
-	'Details',
-	'Prompts',
-	'Model',
-	'Tools',
-	'Review',
-] as const;
-
 type Tab = (typeof tabs)[number];
 
 export function useAgentEditor({
@@ -53,15 +45,15 @@ export function useAgentEditor({
 	const [current, setCurrent] = useState<Agent | null>(null),
 		[form, setForm] = useState<AgentConfig>(newAgent),
 		[system, setSystem] = useState<PromptBinding | null>(null),
-		[agentPrompt, setAgentPrompt] = useState<PromptBinding | null>(
+		[agentPrompt, setAgentPrompt] = useState<PromptBinding | null>(null),
+		[evaluationPrompt, setEvaluationPrompt] = useState<PromptBinding | null>(
 			null,
 		),
-		[evaluationPrompt, setEvaluationPrompt] =
-			useState<PromptBinding | null>(null),
 		[tools, setTools] = useState<ToolBinding[]>([]),
-		[tab, setTab] = useState<Tab>('Details'),
-		[step, setStep] = useState<number>(0);
-	const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+		[tab, setTab] = useState<Tab>('Details');
+	const [pendingNavigation, setPendingNavigation] = useState<string | null>(
+		null,
+	);
 	const [loading, setLoading] = useState(!!initial),
 		[busy, setBusy] = useState(false),
 		[pickerBusy, setPickerBusy] = useState(false),
@@ -87,8 +79,7 @@ export function useAgentEditor({
 	const dirty =
 		JSON.stringify(payload) !==
 		JSON.stringify(current ? configOf(current) : newAgent);
-	const editable =
-		canEdit && !denied && !loading && (!initial || !!current);
+	const editable = canEdit && !denied && !loading && (!initial || !!current);
 	const disabled = !editable || busy || pickerBusy;
 	function apply(value: Agent) {
 		setCurrent(value);
@@ -121,17 +112,18 @@ export function useAgentEditor({
 			controller.abort();
 		};
 	}, [base, identifier, current?.id]);
-	useUnsavedChanges(dirty, pageMode ? href => { setPendingNavigation(href); setDiscard(true); } : undefined);
+	useUnsavedChanges(
+		dirty,
+		pageMode
+			? href => {
+					setPendingNavigation(href);
+					setDiscard(true);
+				}
+			: undefined,
+	);
 	function fail(e: unknown) {
-		setError(
-			e instanceof Error
-				? e.message
-				: 'Unable to save agent.',
-		);
-		if (
-			e instanceof ProjectRequestError &&
-			[403, 404].includes(e.status)
-		)
+		setError(e instanceof Error ? e.message : 'Unable to save agent.');
+		if (e instanceof ProjectRequestError && [403, 404].includes(e.status))
 			setDenied(true);
 	}
 	function close() {
@@ -150,16 +142,13 @@ export function useAgentEditor({
 		setNotice('');
 		try {
 			const saved = await projectWrite<Agent>(
-				current
-					? `${base}/${current.id}/revisions`
-					: base,
+				current ? `${base}/${current.id}/revisions` : base,
 				'POST',
 				{
 					...payload,
 					...(current
 						? {
-								base_revision:
-									current.revision,
+								base_revision: current.revision,
 							}
 						: {}),
 				},
@@ -201,10 +190,7 @@ export function useAgentEditor({
 			setBusy(false);
 		}
 	}
-	function field<K extends keyof AgentConfig>(
-		key: K,
-		value: AgentConfig[K],
-	) {
+	function field<K extends keyof AgentConfig>(key: K, value: AgentConfig[K]) {
 		setForm(old => ({ ...old, [key]: value }));
 	}
 	const managing = !!initial || !!current;
@@ -224,8 +210,6 @@ export function useAgentEditor({
 		setTools,
 		tab,
 		setTab,
-		step,
-		setStep,
 		loading,
 		busy,
 		pickerBusy,

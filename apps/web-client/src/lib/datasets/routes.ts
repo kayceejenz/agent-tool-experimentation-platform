@@ -23,6 +23,11 @@ export async function datasetRoute(
 				segments[3] === 'preview');
 		if (!uuidPattern.test(projectId) || !validPath)
 			return json({ error: 'Dataset not found.' }, 404);
+		if (request.method === 'DELETE') {
+			checkOrigin(request);
+			if (segments.length !== 1)
+				return json({ error: 'Dataset not found.' }, 404);
+		}
 		if (request.method === 'POST') {
 			checkOrigin(request);
 			if (

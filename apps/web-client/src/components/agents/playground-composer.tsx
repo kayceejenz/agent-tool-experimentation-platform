@@ -1,15 +1,24 @@
 'use client';
 import Link from 'next/link';
+import { AnalysisDatasetPicker } from './analysis-dataset-picker';
 import type { useAgentPlayground } from './use-agent-playground';
 import { ArrowUp } from 'lucide-react';
 import type { AgentSummary } from '@/types/agent';
 
 type Props = Pick<
 	ReturnType<typeof useAgentPlayground>,
-	'updateInput' | 'input' | 'busy' | 'taskInput' | 'start'
+	| 'updateInput'
+	| 'input'
+	| 'busy'
+	| 'taskInput'
+	| 'start'
+	| 'datasetId'
+	| 'updateDataset'
 > & { canRun: boolean; agent: AgentSummary; projectId: string };
 
 export function PlaygroundComposer({
+	datasetId,
+	updateDataset,
 	updateInput,
 	input,
 	busy,
@@ -17,7 +26,7 @@ export function PlaygroundComposer({
 	start,
 	canRun,
 	agent,
- projectId,
+	projectId,
 }: Props) {
 	return (
 		<section className='playground-composer' aria-label='Run agent'>
@@ -28,10 +37,15 @@ export function PlaygroundComposer({
 				onSubmit={e => {
 					e.preventDefault();
 					void start();
-				}}>
-				<label
-					htmlFor='playground-task'
-					className='playground-task-label'>
+				}}
+			>
+				<AnalysisDatasetPicker
+					projectId={projectId}
+					value={datasetId}
+					onChange={updateDataset}
+					disabled={busy || !canRun}
+				/>
+				<label htmlFor='playground-task' className='playground-task-label'>
 					Your task
 				</label>
 				<div className='playground-input-box'>
@@ -44,63 +58,41 @@ export function PlaygroundComposer({
 						placeholder='Describe the outcome you need and any constraints…'
 						maxLength={16000}
 						disabled={busy || !canRun}
-						onChange={event =>
-							updateInput(
-								event.target
-									.value,
-							)
-						}
+						onChange={event => updateInput(event.target.value)}
 						onKeyDown={e => {
 							if (
-								e.key ===
-									'Enter' &&
-								(e.metaKey ||
-									e.ctrlKey) &&
-								!e.nativeEvent
-									.isComposing
+								e.key === 'Enter' &&
+								(e.metaKey || e.ctrlKey) &&
+								!e.nativeEvent.isComposing
 							) {
 								e.preventDefault();
-								if (
-									!busy &&
-									canRun &&
-									agent.enabled &&
-									input.trim()
-								)
+								if (!busy && canRun && agent.enabled && input.trim())
 									e.currentTarget.form?.requestSubmit();
 							}
 						}}
 					/>
 					<div className='execution-actions'>
-						<span>
-							Ctrl / ⌘ + Enter to run
-						</span>
+						<span>Ctrl / ⌘ + Enter to run</span>
 						<button
 							className='button primary'
-							disabled={
-								busy ||
-								!canRun ||
-								!agent.enabled ||
-								!input.trim()
-							}>
-							{busy
-								? 'Starting…'
-								: 'Run task'}
-							<ArrowUp
-								size={16}
-								aria-hidden='true'
-							/>
+							disabled={busy || !canRun || !agent.enabled || !input.trim()}
+						>
+							{busy ? 'Starting…' : 'Run task'}
+							<ArrowUp size={16} aria-hidden='true' />
 						</button>
 					</div>
 				</div>
 				{!canRun && (
 					<p className='mcp-note'>
-						You have read-only access. Open
-						History to inspect saved tasks.
+						You have read-only access. Open History to inspect saved tasks.
 					</p>
 				)}
 				{canRun && !agent.enabled && (
 					<p className='mcp-note'>
-						Enable this agent in its configuration to run a task. <Link href={`/projects/${projectId}/agents/${agent.id}`}>Open configuration</Link>
+						Enable this agent in its configuration to run a task.{' '}
+						<Link href={`/projects/${projectId}/agents/${agent.id}`}>
+							Open configuration
+						</Link>
 					</p>
 				)}
 			</form>

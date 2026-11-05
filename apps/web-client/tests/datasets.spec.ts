@@ -150,3 +150,89 @@ test('upload validation preserves files and shows removable selections', async (
 		}),
 	).toBeFocused();
 });
+
+test('delete a dataset with confirmation and preserve it when cancelled or blocked', async ({
+	page,
+	context,
+}) => {
+	const headers = { Origin: ORIGIN };
+	const project = await (
+		await context.request.post('/api/projects', {
+			headers,
+			data: { name: 'Dataset deletion' },
+		})
+	).json();
+	const base = `/api/projects/${project.id}/datasets`;
+	const uploaded = await context.request.post(base, {
+		headers,
+		multipart: {
+			name: 'Disposable trial',
+			files: {
+				name: 'events.csv',
+				mimeType: 'text/csv',
+				buffer: Buffer.from('animal,value\n001,24\n'),
+			},
+		},
+	});
+	expect(uploaded.status()).toBe(201);
+	const dataset = await uploaded.json();
+	await page.goto(`/projects/${project.id}/datasets`);
+	await page
+		.getByRole('button', { name: 'Expand Disposable trial', exact: true })
+		.click();
+	await expect(
+		page.getByRole('button', { name: 'Preview events.csv' }),
+	).toBeVisible();
+	const remove = page.getByRole('button', {
+		name: 'Delete Disposable trial',
+		exact: true,
+	});
+	await remove.click();
+	const dialog = page.getByRole('dialog', {
+		name: 'Delete dataset',
+		exact: true,
+	});
+	await expect(dialog).toContainText('This cannot be undone');
+	await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await expect(remove).toBeFocused();
+	expect((await context.request.get(`${base}/${dataset.id}`)).status()).toBe(
+		200,
+	);
+	await page.route(`**/datasets/${dataset.id}`, async route => {
+		if (route.request().method() === 'DELETE')
+			await route.fulfill({
+				status: 409,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					error: 'Wait for analyses using this dataset to finish',
+				}),
+			});
+		else await route.continue();
+	});
+	await remove.click();
+	await dialog
+		.getByRole('button', { name: 'Delete dataset', exact: true })
+		.click();
+	await expect(dialog.getByRole('alert')).toContainText('Wait for analyses');
+	await page.unroute(`**/datasets/${dataset.id}`);
+	await dialog
+		.getByRole('button', { name: 'Delete dataset', exact: true })
+		.click();
+	await expect(dialog).toHaveCount(0);
+	await expect(remove).toHaveCount(0);
+	await expect(
+		page.getByRole('heading', { name: 'Add your first dataset' }),
+	).toBeVisible();
+	await page.reload();
+	await expect(
+		page.getByRole('heading', { name: 'Add your first dataset' }),
+	).toBeVisible();
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	expect((await context.request.get(`${base}/${dataset.id}`)).status()).toBe(
+		404,
+	);
+	const denied = await context.request.delete(`${base}/${dataset.id}`, {
+		headers: { Origin: 'https://untrusted.example' },
+	});
+	expect(denied.status()).toBe(403);
+});

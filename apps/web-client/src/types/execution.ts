@@ -43,6 +43,10 @@ export type ExecutionStatus = Pick<
 	failure_hint: string | null;
 };
 
-export type ExecutionOverview = ExecutionSummary & ExecutionStatus;
+export type ExecutionOverview = ExecutionSummary &
+	ExecutionStatus & {
+		analysis_dataset_id?: string | null;
+		analysis_phase?: string | null;
+	};
 
 export type SpanSummary = Omit<ExecutionSpan, 'inputs' | 'outputs'>;

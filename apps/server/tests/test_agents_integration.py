@@ -215,3 +215,39 @@ def test_agent_tool_drift_and_pagination(connections, monkeypatch):
     second = client.get(base + "?offset=20", headers=owner).json()
     assert len(first["items"]) == 20 and first["next_offset"] == 20
     assert len(second["items"]) == 1 and second["next_offset"] is None
+
+
+def test_agent_without_custom_prompts_can_be_enabled(connections):
+    client, _, users, project, _ = connections
+    owner = users[0][1]
+    base = f"/api/v1/projects/{project}/agents"
+    response = client.post(
+        base,
+        headers=owner,
+        json={
+            "name": "Dataset analyst",
+            "model_settings": {"provider": "openai", "model": "test-model"},
+        },
+    )
+    assert response.status_code == 201
+    agent = response.json()
+    assert agent["configuration_ready"]
+    assert agent["configuration_issues"] == []
+    assert agent["system_prompt"] is None and agent["agent_prompt"] is None
+    assert agent["tools"] == []
+    url = f"{base}/{agent['id']}"
+    enabled = client.patch(
+        url, headers=owner, json={"enabled": True, "base_revision": 1}
+    )
+    assert enabled.status_code == 200 and enabled.json()["enabled"]
+    # Optional prompts also survive later revisions without blocking readiness.
+    revised = client.post(
+        url + "/revisions",
+        headers=owner,
+        json={
+            "name": "Renamed analyst",
+            "model_settings": agent["model_settings"],
+            "base_revision": 1,
+        },
+    )
+    assert revised.status_code == 200 and revised.json()["configuration_ready"]

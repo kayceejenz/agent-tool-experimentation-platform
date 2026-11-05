@@ -1,0 +1,222 @@
+.root {
+	margin: 28px 0;
+	padding: 24px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	min-width: 0;
+}
+.heading {
+	display: flex;
+	justify-content: space-between;
+	align-items: start;
+	gap: 16px;
+	margin-bottom: 20px;
+}
+.heading h3 {
+	margin: 0 0 8px;
+	font-size: 18px;
+}
+.heading p,
+.note {
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 1.6;
+	margin: 0;
+}
+.note {
+	margin: 16px 0 0;
+}
+.actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.chartGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+	gap: 20px;
+}
+.chartGrid figure {
+	margin: 0;
+	min-width: 0;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	overflow: hidden;
+}
+.chartButton {
+	display: block;
+	width: 100%;
+	padding: 12px;
+	border: 0;
+	background: white;
+	cursor: zoom-in;
+}
+.chartButton img {
+	width: 100%;
+	height: auto;
+	display: block;
+}
+.chartButton:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -3px;
+}
+.chartGrid figcaption {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 16px;
+	border-top: 1px solid var(--line);
+	font-size: 13px;
+	flex-wrap: wrap;
+}
+.chartGrid figcaption > span {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	overflow-wrap: anywhere;
+	min-width: 0;
+}
+.fileList {
+	list-style: none;
+	padding: 0;
+	margin: 20px 0 0;
+}
+.fileList li {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 16px 0;
+	border-top: 1px solid var(--line);
+}
+.fileList li > div:first-of-type {
+	flex: 1;
+	min-width: 0;
+}
+.fileList strong {
+	display: block;
+	font-size: 14px;
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+.fileList small {
+	display: block;
+	color: var(--muted);
+	margin-top: 6px;
+}
+.fileList svg {
+	flex-shrink: 0;
+}
+.scripts {
+	margin-top: 20px;
+	padding-top: 16px;
+	border-top: 1px solid var(--line);
+}
+.scripts summary {
+	cursor: pointer;
+	font-size: 14px;
+}
+.error {
+	color: var(--danger);
+	line-height: 1.6;
+}
+.modal {
+	width: min(1120px, calc(100vw - 32px));
+	max-height: calc(100dvh - 32px);
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 14px;
+	background: var(--panel);
+	color: var(--foreground);
+	box-shadow: 0 24px 80px rgb(0 0 0 / 22%);
+}
+.modal::backdrop {
+	background: rgb(15 23 42 / 45%);
+}
+.modal header {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--panel);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+	padding: 20px 24px;
+	border-bottom: 1px solid var(--line);
+}
+.modal h2 {
+	font-size: 18px;
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+.modal header p {
+	font-size: 13px;
+	color: var(--muted);
+	margin: 8px 0 0;
+}
+.previewBody {
+	padding: 24px;
+	min-width: 0;
+}
+.previewBody > img {
+	display: block;
+	max-width: 100%;
+	width: auto;
+	height: auto;
+	margin: auto;
+}
+.previewBody pre {
+	overflow: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	max-height: 65dvh;
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.7;
+	padding: 16px;
+	background: var(--subtle);
+	border-radius: 8px;
+}
+.tableScroll {
+	overflow: auto;
+	max-height: 60dvh;
+}
+.tableScroll table {
+	border-collapse: separate;
+	border-spacing: 0;
+	width: 100%;
+	font-size: 13px;
+}
+.tableScroll th,
+.tableScroll td {
+	padding: 12px 16px;
+	text-align: left;
+	border-bottom: 1px solid var(--line);
+	white-space: nowrap;
+}
+.tableScroll th {
+	position: sticky;
+	top: 0;
+	background: var(--panel-strong);
+}
+@media (max-width: 640px) {
+	.root {
+		padding: 16px;
+	}
+	.modal header {
+		padding: 16px;
+		flex-wrap: wrap;
+	}
+	.previewBody {
+		padding: 16px;
+	}
+	.fileList li {
+		flex-wrap: wrap;
+	}
+	.fileList .actions {
+		flex-basis: 100%;
+	}
+}

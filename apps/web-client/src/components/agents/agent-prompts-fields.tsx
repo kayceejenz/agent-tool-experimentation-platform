@@ -24,8 +24,8 @@ export function AgentPromptsFields({
 	return (
 		<>
 			<p className='mcp-note'>
-				Select the prompt revisions the agent will use
-				for this task.
+				Optional: add reusable instructions to customise this agent. You can
+				leave both prompts empty and describe your task in the playground.
 			</p>
 			<PromptPicker
 				projectId={projectId}

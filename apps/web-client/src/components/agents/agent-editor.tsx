@@ -4,11 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { type AgentSummary } from '@/types/agent';
 import { AgentHistory } from './agent-history';
-import {
-	useAgentEditor,
-	tabs,
-	wizardSteps,
-} from '@/components/agents/use-agent-editor';
+import { useAgentEditor, tabs } from '@/components/agents/use-agent-editor';
 import { AgentDetailsFields } from './agent-details-fields';
 import { AgentEvaluationFields } from './agent-evaluation-fields';
 import { AgentPromptsFields } from './agent-prompts-fields';
@@ -48,8 +44,6 @@ export function AgentEditor({
 		setTools,
 		tab,
 		setTab,
-		step,
-		setStep,
 		loading,
 		busy,
 		pickerBusy,
@@ -76,14 +70,14 @@ export function AgentEditor({
 	});
 	const router = useRouter();
 	const sectionHeading = useRef<HTMLHeadingElement>(null);
-	const previousSection = useRef(`${tab}:${step}`);
+	const previousSection = useRef(tab);
 	useEffect(() => {
-		const next = `${tab}:${step}`;
+		const next = tab;
 		if (previousSection.current !== next) {
 			sectionHeading.current?.focus();
 			previousSection.current = next;
 		}
-	}, [tab, step]);
+	}, [tab]);
 	const content = (
 		<>
 			<header className='mcp-sheet-header'>
@@ -94,10 +88,7 @@ export function AgentEditor({
 							: 'Agent configuration'}
 					</p>
 					<h2 id='agent-title'>
-						{current?.name ??
-							(managing
-								? 'Manage agent'
-								: 'Create agent')}
+						{current?.name ?? (managing ? 'Manage agent' : 'Create agent')}
 					</h2>
 				</div>
 				<button
@@ -112,15 +103,10 @@ export function AgentEditor({
 					<UnsavedChanges
 						onKeepEditing={() => {
 							setDiscard(false);
-							setPendingNavigation(
-								null,
-							);
+							setPendingNavigation(null);
 						}}
 						onDiscard={() => {
-							if (pendingNavigation)
-								router.push(
-									pendingNavigation,
-								);
+							if (pendingNavigation) router.push(pendingNavigation);
 							else onClose();
 						}}
 					/>
@@ -131,72 +117,21 @@ export function AgentEditor({
 					</p>
 				)}
 				{notice && <p role='status'>{notice}</p>}
-				{!managing && (
-					<div
-						className='prompt-tabs agent-tabs agent-wizard-steps'
-						role='group'
-						aria-label='Agent creation wizard steps'>
-						{wizardSteps.map(
-							(item, index) => (
-								<button
-									type='button'
-									key={
-										item
-									}
-									className='button'
-									disabled={
-										busy ||
-										pickerBusy
-									}
-									aria-pressed={
-										index ===
-										step
-									}
-									onClick={() =>
-										setStep(
-											index,
-										)
-									}>
-									{index +
-										1}
-									. {item}
-								</button>
-							),
-						)}
-					</div>
-				)}
 				{managing && (
 					<div
 						className='prompt-tabs agent-tabs'
 						role='group'
 						aria-label='Agent configuration sections'>
 						{tabs
-							.filter(
-								t =>
-									t !==
-										'History' ||
-									current,
-							)
+							.filter(t => t !== 'History' || current)
 							.map(item => (
 								<button
 									type='button'
-									key={
-										item
-									}
+									key={item}
 									className='button'
-									disabled={
-										busy ||
-										pickerBusy
-									}
-									aria-pressed={
-										item ===
-										tab
-									}
-									onClick={() =>
-										setTab(
-											item,
-										)
-									}>
+									disabled={busy || pickerBusy}
+									aria-pressed={item === tab}
+									onClick={() => setTab(item)}>
 									{item}
 								</button>
 							))}
@@ -206,13 +141,9 @@ export function AgentEditor({
 					ref={sectionHeading}
 					tabIndex={-1}
 					className='configuration-section-title'>
-					{managing ? tab : wizardSteps[step]}
+					{managing ? tab : 'Name and model'}
 				</h3>
-				{!canEdit && (
-					<p className='mcp-note'>
-						You have read-only access.
-					</p>
-				)}
+				{!canEdit && <p className='mcp-note'>You have read-only access.</p>}
 				{loading ? (
 					<p role='status'>Loading agent…</p>
 				) : managing && tab === 'History' && current ? (
@@ -222,338 +153,110 @@ export function AgentEditor({
 					/>
 				) : (
 					<form onSubmit={save}>
-						{(managing
-							? tab === 'Details'
-							: step === 0) && (
+						{!managing && (
+							<p className='mcp-note'>
+								Give your agent a name and choose a model. To analyse a dataset,
+								select it in the playground; file and Python tools are provided
+								automatically. Custom prompts and MCP tools are optional.
+							</p>
+						)}
+						{(!managing || tab === 'Details') && (
 							<AgentDetailsFields
-								current={
-									current
-								}
+								current={current}
 								form={form}
 								dirty={dirty}
-								disabled={
-									disabled
-								}
+								disabled={disabled}
 								toggle={toggle}
 								field={field}
-								managing={
-									managing
-								}
+								managing={managing}
 							/>
 						)}
-						{(managing
-							? tab === 'Prompts'
-							: step === 1) && (
-							<AgentPromptsFields
-								system={system}
-								setSystem={
-									setSystem
-								}
-								agentPrompt={
-									agentPrompt
-								}
-								setAgentPrompt={
-									setAgentPrompt
-								}
-								setPickerBusy={
-									setPickerBusy
-								}
-								disabled={
-									disabled
-								}
-								projectId={
-									projectId
-								}
-							/>
+						{(!managing || tab === 'Model') && (
+							<AgentModelFields form={form} disabled={disabled} field={field} />
 						)}
-						{(managing
-							? tab === 'Model'
-							: step === 2) && (
-							<AgentModelFields
-								form={form}
-								disabled={
-									disabled
-								}
-								field={field}
-							/>
-						)}
-						{(managing
-							? tab === 'Tools'
-							: step === 3) && (
-							<AgentToolsFields
-								tools={tools}
-								setTools={
-									setTools
-								}
-								disabled={
-									disabled
-								}
-								projectId={
-									projectId
-								}
-							/>
-						)}
-						{!managing && step === 4 && (
-							<section
-								className='configuration-review'
-								aria-label='Configuration summary'>
-								<h4>
-									Review
-									your
-									agent
-								</h4>
-								<dl>
-									<div>
-										<dt>
-											Name
-										</dt>
-										<dd>
-											{form.name ||
-												'Not set'}
-										</dd>
-									</div>
-									<div>
-										<dt>
-											Model
-										</dt>
-										<dd>
-											{form
-												.model_settings
-												.model ||
-												'Choose a model before running'}
-										</dd>
-									</div>
-									<div>
-										<dt>
-											Instructions
-										</dt>
-										<dd>
-											{system?.name ??
-												'No system prompt'}{' '}
-											·{' '}
-											{agentPrompt?.name ??
-												'No agent prompt'}
-										</dd>
-									</div>
-									<div>
-										<dt>
-											Tools
-										</dt>
-										<dd>
-											{
-												tools.length
-											}{' '}
-											selected
-										</dd>
-									</div>
-									<div>
-										<dt>
-											Evaluation
-										</dt>
-										<dd>
-											{form
-												.evaluation_profile
-												.enabled
-												? 'Automatic'
-												: 'Manual'}
-										</dd>
-									</div>
-								</dl>
-								<p>
-									You can
-									save a
-									draft.
-									Complete
-									the
-									configuration
-									and
-									enable
-									the
-									agent
-									before
-									running
-									a task.
-								</p>
-							</section>
-						)}
-						{(managing
-							? tab === 'Limits'
-							: step === 4) && (
+						{(!managing || tab === 'Prompts') && (
 							<details
 								className='advanced-settings'
-								open={
-									managing ||
-									undefined
-								}>
-								<summary>
-									Advanced
-									execution
-									settings{' '}
-									<span>
-										{
-											form
-												.limits
-												.max_turns
-										}{' '}
-										turns
-										·{' '}
-										{
-											form
-												.limits
-												.timeout_seconds
-										}
-
-										s
-										timeout
-									</span>
-								</summary>
-								<AgentLimitsFields
-									form={
-										form
-									}
-									disabled={
-										disabled
-									}
-									field={
-										field
-									}
+								open={managing || undefined}>
+								<summary>Custom prompts (optional)</summary>
+								<AgentPromptsFields
+									system={system}
+									setSystem={setSystem}
+									agentPrompt={agentPrompt}
+									setAgentPrompt={setAgentPrompt}
+									setPickerBusy={setPickerBusy}
+									disabled={disabled}
+									projectId={projectId}
 								/>
 							</details>
 						)}
-						{(managing
-							? tab === 'Evaluation'
-							: step === 4) && (
+						{(!managing || tab === 'Tools') && (
 							<details
 								className='advanced-settings'
-								open={
-									managing ||
-									undefined
-								}>
+								open={managing || undefined}>
+								<summary>MCP tools (optional)</summary>
+								<AgentToolsFields
+									tools={tools}
+									setTools={setTools}
+									disabled={disabled}
+									projectId={projectId}
+								/>
+							</details>
+						)}
+						{(!managing || tab === 'Limits') && (
+							<details
+								className='advanced-settings'
+								open={managing || undefined}>
 								<summary>
-									Evaluation
-									settings
+									Advanced execution settings{' '}
+									<span>
+										{form.limits.max_turns} turns ·{' '}
+										{form.limits.timeout_seconds}s timeout
+									</span>
 								</summary>
+								<AgentLimitsFields
+									form={form}
+									disabled={disabled}
+									field={field}
+								/>
+							</details>
+						)}
+						{(!managing || tab === 'Evaluation') && (
+							<details
+								className='advanced-settings'
+								open={managing || undefined}>
+								<summary>Evaluation settings</summary>
 								<AgentEvaluationFields
-									form={
-										form
-									}
-									field={
-										field
-									}
-									evaluationPrompt={
-										evaluationPrompt
-									}
-									setEvaluationPrompt={
-										setEvaluationPrompt
-									}
-									setPickerBusy={
-										setPickerBusy
-									}
-									disabled={
-										disabled
-									}
-									projectId={
-										projectId
-									}
+									form={form}
+									field={field}
+									evaluationPrompt={evaluationPrompt}
+									setEvaluationPrompt={setEvaluationPrompt}
+									setPickerBusy={setPickerBusy}
+									disabled={disabled}
+									projectId={projectId}
 								/>
 							</details>
 						)}
 						{canEdit && (
 							<footer className='agent-save'>
 								<p className='mcp-note'>
-									You can
-									save an
-									incomplete
-									configuration.
-									Changed
-									configurations
-									create a
-									new
-									revision
-									and
-									start
-									disabled.
+									You can save an incomplete configuration. Changed
+									configurations create a new revision and start disabled.
 								</p>
 								{!managing && (
-									<div
-										style={{
-											display: 'flex',
-											gap: '8px',
-											justifyContent:
-												'flex-end',
-										}}>
-										{step >
-											0 && (
-											<button
-												type='button'
-												className='button'
-												disabled={
-													busy ||
-													pickerBusy
-												}
-												onClick={() =>
-													setStep(
-														s =>
-															s -
-															1,
-													)
-												}>
-												Back
-											</button>
-										)}
-										{step <
-											wizardSteps.length -
-												1 && (
-											<button
-												type='button'
-												className='button primary'
-												disabled={
-													busy ||
-													pickerBusy ||
-													(step ===
-														0 &&
-														!form.name.trim())
-												}
-												onClick={() =>
-													setStep(
-														s =>
-															s +
-															1,
-													)
-												}>
-												Next
-											</button>
-										)}
-										{step ===
-											wizardSteps.length -
-												1 && (
-											<button
-												className='button primary'
-												type='submit'
-												disabled={
-													disabled ||
-													!dirty ||
-													!form.name.trim()
-												}>
-												{busy
-													? 'Saving…'
-													: 'Create agent'}
-											</button>
-										)}
-									</div>
+									<button
+										className='button primary'
+										type='submit'
+										disabled={disabled || !form.name.trim()}>
+										{busy ? 'Creating…' : 'Create agent'}
+									</button>
 								)}
 								{managing && (
 									<button
 										className='button primary'
 										type='submit'
-										disabled={
-											disabled ||
-											!dirty ||
-											!form.name.trim()
-										}>
-										{busy
-											? 'Saving…'
-											: 'Save new revision'}
+										disabled={disabled || !dirty || !form.name.trim()}>
+										{busy ? 'Saving…' : 'Save new revision'}
 									</button>
 								)}
 							</footer>
@@ -563,46 +266,29 @@ export function AgentEditor({
 				{current && pageMode && (
 					<div className='agent-next-actions'>
 						{dirty ? (
-							<p>
-								Save your
-								changes before
-								running this
-								configuration.
-							</p>
+							<p>Save your changes before running this configuration.</p>
 						) : current.enabled ? (
 							<Link
 								className='button primary'
 								href={`/projects/${projectId}/agents/${current.id}/playground`}>
 								Open playground
 							</Link>
-						) : canEdit &&
-						  current.configuration_ready ? (
+						) : canEdit && current.configuration_ready ? (
 							<button
 								type='button'
 								className='button primary'
-								disabled={
-									disabled
-								}
+								disabled={disabled}
 								onClick={async () => {
-									const saved =
-										await toggle();
-									if (
-										saved?.enabled
-									)
+									const saved = await toggle();
+									if (saved?.enabled)
 										router.push(
 											`/projects/${projectId}/agents/${saved.id}/playground`,
 										);
 								}}>
-								Enable and open
-								playground
+								Enable and open playground
 							</button>
 						) : (
-							<p>
-								Complete the
-								configuration to
-								enable this
-								agent.
-							</p>
+							<p>Complete the configuration to enable this agent.</p>
 						)}
 					</div>
 				)}
@@ -611,9 +297,7 @@ export function AgentEditor({
 	);
 	if (pageMode)
 		return (
-			<section
-				className='agent-page-panel'
-				aria-label='Agent configuration'>
+			<section className='agent-page-panel' aria-label='Agent configuration'>
 				{content}
 			</section>
 		);

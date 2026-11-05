@@ -58,13 +58,23 @@ class DatasetStorage:
             path.unlink(missing_ok=True)
             raise
 
-    def remove(self, dataset_id):
+    def remove(self, dataset_id, strict=False):
         from uuid import UUID
 
         directory = self.root / str(UUID(str(dataset_id)))
         if directory.is_symlink():
             raise HTTPException(404, "Dataset unavailable")
-        shutil.rmtree(directory, ignore_errors=True)
+        if strict:
+            try:
+                shutil.rmtree(directory)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                raise HTTPException(
+                    503, "Dataset files could not be removed. Please retry"
+                ) from None
+        else:
+            shutil.rmtree(directory, ignore_errors=True)
 
     def preview(self, dataset_id, file_id):
         path = self.path(dataset_id, file_id)

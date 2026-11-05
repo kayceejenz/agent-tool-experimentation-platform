@@ -48,6 +48,7 @@ async def serve():
     repository = ExecutionRepository(
         database,
         configured_secrets(settings),
+        settings=settings,
     )
     executor = ToolService(
         ToolRepository(database),

@@ -151,8 +151,6 @@ class AgentRepository:
                     )
                 ).fetchone()
                 result[kind + "_prompt"] = prompt
-            else:
-                issues.append("Select a " + kind + " prompt revision.")
         if not row["model_settings"]["provider"] or not row["model_settings"]["model"]:
             issues.append("Specify a provider and model.")
         tools = await (

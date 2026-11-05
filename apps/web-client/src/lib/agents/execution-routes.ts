@@ -1,4 +1,5 @@
 import 'server-only';
+import { isRecord } from '@/lib/http/response';
 import {
 	BODY_LIMITS,
 	readBoundedJson,
@@ -17,6 +18,7 @@ export async function executionRoute(
 	if (!uuid.test(projectId) || !uuid.test(id))
 		return json({ error: 'Execution not found.' }, 404);
 	try {
+		let analysisRequested = false;
 		let path = `/${projectId}/${mode === 'agent' ? `agents/${id}/executions` : `executions/${id}${mode === 'cancel' ? '/cancel' : ''}`}`;
 		if (mode === 'cancel') path += '?view=summary';
 		const init: RequestInit = { method: request.method };
@@ -24,51 +26,38 @@ export async function executionRoute(
 			const input = new URL(request.url).searchParams,
 				query = new URLSearchParams();
 			for (const key of ['offset', 'view'])
-				if (input.has(key))
-					query.set(key, input.get(key)!);
+				if (input.has(key)) query.set(key, input.get(key)!);
 			path += `?${query}`;
 		} else {
 			checkOrigin(request);
 			if (mode === 'agent') {
 				if (
-					!request.headers
-						.get('content-type')
-						?.startsWith('application/json')
+					!request.headers.get('content-type')?.startsWith('application/json')
 				)
-					return json(
-						{ error: 'Send JSON data.' },
-						415,
-					);
-				init.body = JSON.stringify(
-					await readBoundedJson(
-						request,
-						BODY_LIMITS.execution,
-					),
-				);
+					return json({ error: 'Send JSON data.' }, 415);
+				const body = await readBoundedJson(request, BODY_LIMITS.execution);
+				analysisRequested = isRecord(body) && Boolean(body.analysis);
+				init.body = JSON.stringify(body);
 			} else {
-				await readBoundedBody(
-					request,
-					BODY_LIMITS.control,
-				);
+				await readBoundedBody(request, BODY_LIMITS.control);
 			}
 		}
 		return json(
 			await projectApi(path, init, {
 				403: 'Your role cannot run or cancel agents.',
-				404: 'Execution not found or access removed.',
+				404: analysisRequested
+					? 'Agent or dataset not found in this project, or access removed.'
+					: 'Execution not found or access removed.',
 				409: 'Enable the current agent revision and its tools, or wait for pending runs to finish.',
 				422: 'Check the task and select a supported model configuration.',
-				503: 'Executions are temporarily unavailable. Please try again.',
+				503: analysisRequested
+					? 'Analysis is unavailable. Check Docker, the built sandbox image and model provider credentials, then retry.'
+					: 'Executions are temporarily unavailable. Please try again.',
 			}),
-			request.method === 'POST' && mode === 'agent'
-				? 202
-				: 200,
+			request.method === 'POST' && mode === 'agent' ? 202 : 200,
 		);
 	} catch (error) {
-		return routeError(
-			error,
-			'Executions are temporarily unavailable.',
-		);
+		return routeError(error, 'Executions are temporarily unavailable.');
 	}
 }
 
@@ -80,8 +69,8 @@ export async function traceRoute(
 	spanId?: string,
 ) {
 	if (
-		![projectId, executionId, ...(spanId ? [spanId] : [])].every(
-			id => uuid.test(id),
+		![projectId, executionId, ...(spanId ? [spanId] : [])].every(id =>
+			uuid.test(id),
 		)
 	)
 		return json({ error: 'Execution not found.' }, 404);
@@ -96,10 +85,7 @@ export async function traceRoute(
 			),
 		);
 	} catch (error) {
-		return routeError(
-			error,
-			'Execution details are temporarily unavailable.',
-		);
+		return routeError(error, 'Execution details are temporarily unavailable.');
 	}
 }
 
@@ -117,17 +103,10 @@ export async function evaluationRoute(
 		const init: RequestInit = { method: request.method };
 		if (request.method === 'POST') {
 			checkOrigin(request);
-			if (
-				!request.headers
-					.get('content-type')
-					?.startsWith('application/json')
-			)
+			if (!request.headers.get('content-type')?.startsWith('application/json'))
 				return json({ error: 'Send JSON data.' }, 415);
 			init.body = JSON.stringify(
-				await readBoundedJson(
-					request,
-					BODY_LIMITS.execution,
-				),
+				await readBoundedJson(request, BODY_LIMITS.execution),
 			);
 		}
 		return json(
@@ -144,9 +123,6 @@ export async function evaluationRoute(
 			request.method === 'POST' ? 202 : 200,
 		);
 	} catch (error) {
-		return routeError(
-			error,
-			'Evaluations are temporarily unavailable.',
-		);
+		return routeError(error, 'Evaluations are temporarily unavailable.');
 	}
 }

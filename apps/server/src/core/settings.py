@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     )
 
     sandbox_storage_root: str = "./var/sandboxes"
+    # Download availability window; physical cleanup remains operator-managed.
+    sandbox_artifact_retention_days: int = Field(default=7, ge=1, le=365)
     sandbox_image: str = "agent-analysis:phase2"
     sandbox_command_seconds: int = Field(default=60, ge=1, le=300)
     sandbox_session_seconds: int = Field(default=300, ge=1, le=900)

@@ -40,22 +40,17 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 	).json();
 	expect(
 		(
-			await context.request.post(
-				`${base}/mcp-servers/${server.id}/discover`,
-				{
-					headers,
-					data: {},
-				},
-			)
+			await context.request.post(`${base}/mcp-servers/${server.id}/discover`, {
+				headers,
+				data: {},
+			})
 		).ok(),
 	).toBeTruthy();
 	await context.request.patch(`${base}/mcp-servers/${server.id}`, {
 		headers,
 		data: { enabled: true },
 	});
-	const catalog = await (
-		await context.request.get(`${base}/tools`)
-	).json();
+	const catalog = await (await context.request.get(`${base}/tools`)).json();
 	const tool = catalog.items.find(
 		(item: { name: string }) => item.name === 'describe_store',
 	);
@@ -64,17 +59,13 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 		data: { enabled: true, revision: tool.revision },
 	});
 	await page.goto(`/projects/${project.id}/agents`);
-	await page
-		.getByRole('link', { name: 'Create agent', exact: true })
-		.click();
+	await page.getByRole('link', { name: 'Create agent', exact: true }).click();
 	const dialog = page.getByRole('region', {
 		name: 'Agent configuration',
 		exact: true,
 	});
-	await dialog
-		.getByLabel('Name', { exact: true })
-		.fill('Commerce analyst');
-	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+	await dialog.getByLabel('Name', { exact: true }).fill('Commerce analyst');
+	await dialog.getByText('Custom prompts (optional)', { exact: true }).click();
 	await dialog
 		.getByRole('combobox', { name: 'System prompt', exact: true })
 		.selectOption(refs.system);
@@ -93,7 +84,7 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 			exact: true,
 		}),
 	).toHaveValue('1');
-	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+
 	await dialog
 		.getByRole('combobox', { name: 'Model', exact: true })
 
@@ -118,28 +109,22 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 	await dialog
 		.getByRole('combobox', { name: 'Model', exact: true })
 		.selectOption('gpt-4.1-mini');
-	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+	await dialog.getByText('MCP tools (optional)', { exact: true }).click();
 	await dialog.getByRole('checkbox', { name: /describe_store/ }).check();
-	await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+
 	await dialog
 		.getByRole('button', { name: 'Create agent', exact: true })
 		.click();
 	await expect(page).toHaveURL(/agents\/[0-9a-f-]{36}$/);
 	await expect(dialog.locator('.eyebrow')).toContainText('Revision 1');
-	await dialog
-		.getByRole('button', { name: 'Details', exact: true })
-		.click();
+	await dialog.getByRole('button', { name: 'Details', exact: true }).click();
 	await dialog.getByRole('switch').click();
 	await expect(dialog.getByRole('switch')).toBeChecked();
 	await dialog.getByLabel('Description').fill('Revised description');
 	await dialog.getByRole('button', { name: 'Save new revision' }).click();
-	await expect(dialog.getByRole('status')).toContainText(
-		'Revision 2 saved.',
-	);
+	await expect(dialog.getByRole('status')).toContainText('Revision 2 saved.');
 	await expect(dialog.getByRole('switch')).not.toBeChecked();
-	await dialog
-		.getByRole('button', { name: 'History', exact: true })
-		.click();
+	await dialog.getByRole('button', { name: 'History', exact: true }).click();
 	await dialog
 		.getByRole('button', { name: 'View revision 1', exact: true })
 		.click();
@@ -149,25 +134,17 @@ test('configure agents, pin prompts, preserve history and reset availability on 
 	await dialog
 		.getByRole('button', { name: 'View revision 2', exact: true })
 		.click();
-	await expect(dialog.locator('.agent-preview')).toContainText(
-		'gpt-4.1-mini',
-	);
+	await expect(dialog.locator('.agent-preview')).toContainText('gpt-4.1-mini');
 	await dialog
 		.getByRole('button', { name: 'Back to agents', exact: true })
 		.click();
-	await expect(page).toHaveURL(
-		new RegExp(`/projects/${project.id}/agents$`),
-	);
+	await expect(page).toHaveURL(new RegExp(`/projects/${project.id}/agents$`));
 	await page.reload();
 	await expect(
 		page.getByRole('row').filter({ hasText: 'Commerce analyst' }),
 	).toContainText('v2');
-	await page
-		.getByRole('button', { name: 'Manage Commerce analyst' })
-		.click();
-	await dialog
-		.getByRole('button', { name: 'Prompts', exact: true })
-		.click();
+	await page.getByRole('button', { name: 'Manage Commerce analyst' }).click();
+	await dialog.getByRole('button', { name: 'Prompts', exact: true }).click();
 	await expect(
 		dialog.getByRole('combobox', {
 			name: 'System prompt',

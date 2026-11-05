@@ -22,6 +22,7 @@ export function useAgentPlayground({
 	pageMode?: boolean;
 }) {
 	const dialog = useModalDialog(!pageMode);
+	const [datasetId, setDatasetId] = useState('');
 	const [input, setInput] = useState(''),
 		[error, setError] = useState(''),
 		[busy, setBusy] = useState(false);
@@ -37,15 +38,27 @@ export function useAgentPlayground({
 	const taskInput = useRef<HTMLTextAreaElement>(null);
 	const base = `/${projectId}`;
 	const pending = run?.status === 'queued' || run?.status === 'running';
- useEffect(() => {
-  if (!pageMode) return;
-  const id = new URL(window.location.href).searchParams.get('execution');
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return;
-  let active = true;
-  const controller = new AbortController();
-  void projectRequest<ExecutionOverview>(`${base}/executions/${id}?view=summary`, { signal: controller.signal }).then(value => { if (active) setRun(value); }).catch(reason => { if (active) setError(reason.message); });
-  return () => { active = false; controller.abort(); };
- }, [base, pageMode]);
+	useEffect(() => {
+		if (!pageMode) return;
+		const id = new URL(window.location.href).searchParams.get('execution');
+		if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return;
+		let active = true;
+		const controller = new AbortController();
+		void projectRequest<ExecutionOverview>(
+			`${base}/executions/${id}?view=summary`,
+			{ signal: controller.signal },
+		)
+			.then(value => {
+				if (active) setRun(value);
+			})
+			.catch(reason => {
+				if (active) setError(reason.message);
+			});
+		return () => {
+			active = false;
+			controller.abort();
+		};
+	}, [base, pageMode]);
 	useEffect(() => {
 		taskInput.current?.focus();
 	}, []);
@@ -70,8 +83,7 @@ export function useAgentPlayground({
 				}
 			})
 			.catch(e => {
-				if (active && !isCancelled(e))
-					setError(e.message);
+				if (active && !isCancelled(e)) setError(e.message);
 			});
 		return () => {
 			active = false;
@@ -80,11 +92,7 @@ export function useAgentPlayground({
 	}, [base, agent.id, refresh]);
 	const updateStatus = useCallback(
 		(value: ExecutionStatus) =>
-			setRun(old =>
-				old && old.id === value.id
-					? { ...old, ...value }
-					: old,
-			),
+			setRun(old => (old && old.id === value.id ? { ...old, ...value } : old)),
 		[],
 	);
 	const finished = useCallback(() => setRefresh(value => value + 1), []);
@@ -94,32 +102,33 @@ export function useAgentPlayground({
 		updateStatus,
 		finished,
 	);
- function selectExecutionUrl(id: string | null) {
-  if (!pageMode) return;
-  const url = new URL(window.location.href);
-  if (id) url.searchParams.set('execution', id); else url.searchParams.delete('execution');
-  window.history.replaceState(window.history.state, '', url.pathname + url.search);
- }
+	function selectExecutionUrl(id: string | null) {
+		if (!pageMode) return;
+		const url = new URL(window.location.href);
+		if (id) url.searchParams.set('execution', id);
+		else url.searchParams.delete('execution');
+		window.history.replaceState(
+			window.history.state,
+			'',
+			url.pathname + url.search,
+		);
+	}
 	async function inspect(id: string) {
 		setBusy(true);
 		setError('');
 		try {
-			setRun(
-				await projectRequest<ExecutionOverview>(
-					`${base}/executions/${id}?view=summary`,
-				),
+			const selected = await projectRequest<ExecutionOverview>(
+				`${base}/executions/${id}?view=summary`,
 			);
+			setRun(selected);
+			setDatasetId(selected.analysis_dataset_id ?? '');
 			selectExecutionUrl(id);
 			setView('run');
 			setShowDetails(false);
 			setExpandedTask(false);
 			setCopied(false);
 		} catch (e) {
-			setError(
-				e instanceof Error
-					? e.message
-					: 'Unable to load execution.',
-			);
+			setError(e instanceof Error ? e.message : 'Unable to load execution.');
 		} finally {
 			setBusy(false);
 		}
@@ -137,17 +146,14 @@ export function useAgentPlayground({
 					input,
 					revision: agent.revision,
 					request_id: id,
+					...(datasetId ? { analysis: { dataset_id: datasetId } } : {}),
 				},
 			);
 			setRequestId(null);
 			await inspect(value.id);
 			setRefresh(n => n + 1);
 		} catch (e) {
-			setError(
-				e instanceof Error
-					? e.message
-					: 'Unable to start execution.',
-			);
+			setError(e instanceof Error ? e.message : 'Unable to start execution.');
 		} finally {
 			setBusy(false);
 		}
@@ -164,11 +170,7 @@ export function useAgentPlayground({
 				),
 			);
 		} catch (e) {
-			setError(
-				e instanceof Error
-					? e.message
-					: 'Unable to cancel execution.',
-			);
+			setError(e instanceof Error ? e.message : 'Unable to cancel execution.');
 		} finally {
 			setBusy(false);
 		}
@@ -179,17 +181,11 @@ export function useAgentPlayground({
 			const page = await projectRequest<{
 				items: ExecutionSummary[];
 				next_offset: number | null;
-			}>(
-				`${base}/agents/${agent.id}/executions?offset=${offset}`,
-			);
+			}>(`${base}/agents/${agent.id}/executions?offset=${offset}`);
 			setHistory(old => [...old, ...page.items]);
 			setOffset(page.next_offset);
 		} catch (e) {
-			setError(
-				e instanceof Error
-					? e.message
-					: 'Unable to load history.',
-			);
+			setError(e instanceof Error ? e.message : 'Unable to load history.');
 		} finally {
 			setBusy(false);
 		}
@@ -200,16 +196,32 @@ export function useAgentPlayground({
 			: run?.termination_reason === 'context_limit'
 				? 'The conversation and tool definitions are too large. Use a smaller task or select fewer tools, then run again.'
 				: null;
-	const failureHint = budgetHint ?? run?.failure_hint;
+	const analysisHints: Record<string, string> = {
+		sandbox_unavailable:
+			'Start Docker and build the analysis image. Check that the API and worker share the dataset storage directory.',
+		sandbox_failed:
+			'The sandbox stopped unexpectedly. Inspect the trace and rerun with a smaller calculation.',
+		sandbox_timeout:
+			'The Python command exceeded its limit. Split the calculation into smaller steps.',
+		dataset_unavailable: 'The selected dataset is no longer accessible.',
+		dataset_changed:
+			'The dataset no longer matches its pinned manifest. Select it again for a new run.',
+		artifact_collection_failed:
+			'Generated files exceeded the export limits or could not be collected.',
+		sandbox_cleanup_failed:
+			'Container cleanup failed. Restore Docker and run sandbox recovery before retrying.',
+	};
+	const failureHint =
+		budgetHint ??
+		analysisHints[run?.termination_reason ?? ''] ??
+		run?.failure_hint;
 	async function copyAnswer() {
 		if (!run?.final_answer) return;
 		try {
 			await navigator.clipboard.writeText(run.final_answer);
 			setCopied(true);
 		} catch {
-			setError(
-				'Unable to copy. Select the answer text to copy it.',
-			);
+			setError('Unable to copy. Select the answer text to copy it.');
 		}
 	}
 	function newTask() {
@@ -223,6 +235,10 @@ export function useAgentPlayground({
 		setExpandedTask(false);
 		setCopied(false);
 		requestAnimationFrame(() => taskInput.current?.focus());
+	}
+	function updateDataset(value: string) {
+		setDatasetId(value);
+		setRequestId(null);
 	}
 	function updateInput(value: string) {
 		setInput(value);
@@ -242,6 +258,8 @@ export function useAgentPlayground({
 	}
 
 	return {
+		datasetId,
+		updateDataset,
 		updateInput,
 		editTask,
 		refreshHistory,

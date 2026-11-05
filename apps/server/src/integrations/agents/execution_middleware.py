@@ -22,17 +22,22 @@ MAX_MESSAGE_CONTEXT_CHARS = 100_000
 
 
 class ExecutionMiddleware(AgentMiddleware):
-    def __init__(self, run, repository, executor, secret=None):
+    def __init__(self, run, repository, executor, secret=None, workspace=None):
         self.secret = secret
+        self.workspace = workspace
         self.run, self.repository, self.executor = run, repository, executor
         self.limits = run["snapshot"]["limits"]
-        self.allowed_tools = {tool["alias"]: tool for tool in run["snapshot"]["tools"]}
+        definitions = [
+            *run["snapshot"]["tools"],
+            *run["snapshot"].get("builtin_tools", []),
+        ]
+        self.allowed_tools = {tool["alias"]: tool for tool in definitions}
         self.schema_context_chars = sum(
             len(compact_json(tool["definition"]))
             + len(tool["alias"])
             + len(tool["server_name"])
             + len(tool["name"])
-            for tool in run["snapshot"]["tools"]
+            for tool in definitions
         )
         self.turns = self.calls = 0
         self.model_span = None
@@ -117,16 +122,19 @@ class ExecutionMiddleware(AgentMiddleware):
             self.seen_calls.add(call["id"])
             self.calls += 1
             tool = self.allowed_tools.get(call["name"])
+            builtin = tool is not None and tool.get("source") == "builtin"
             span = await self.repository.begin_span(
                 self.run["id"],
                 kind="tool",
                 parent_id=self.model_span,
-                name=(tool["server_name"] + " / " + tool["name"])
-                if tool
-                else call["name"],
+                name=(
+                    (tool["server_name"] + " / " + tool["name"])
+                    if tool
+                    else call["name"]
+                ),
                 call_id=call["id"],
                 executor_request_id=uuid5(self.run["id"], call["id"]) if tool else None,
-                tool_id=UUID(tool["id"]) if tool else None,
+                tool_id=UUID(tool["id"]) if tool and not builtin else None,
                 tool_revision=tool["revision"] if tool else None,
                 context_span_ids=self.model_context,
                 inputs=call["args"],
@@ -135,22 +143,39 @@ class ExecutionMiddleware(AgentMiddleware):
                 if not tool:
                     result = {"status": "invalid", "error_code": "tool_not_allowed"}
                 else:
-                    body = ExecuteToolRequest(
-                        revision=tool["revision"],
-                        arguments=call["args"],
-                        request_id=uuid5(self.run["id"], call["id"]),
-                    )
-                    execution = await self.executor.execute(
-                        self.run["user_id"],
-                        self.run["project_id"],
-                        UUID(tool["id"]),
-                        body,
-                    )
+                    if builtin:
+                        if self.workspace is None:
+                            raise RuntimeStop("sandbox_unavailable")
+                        execution = {
+                            "id": None,
+                            "error_code": None,
+                            **await self.workspace.execute(tool, call["args"]),
+                        }
+                    else:
+                        body = ExecuteToolRequest(
+                            revision=tool["revision"],
+                            arguments=call["args"],
+                            request_id=uuid5(self.run["id"], call["id"]),
+                        )
+                        execution = await self.executor.execute(
+                            self.run["user_id"],
+                            self.run["project_id"],
+                            UUID(tool["id"]),
+                            body,
+                        )
                     result = {
                         "status": execution["status"],
                         "result": execution.get("result"),
                         "error_code": execution.get("error_code"),
                     }
+                    if builtin:
+                        result["remaining_tool_calls"] = (
+                            self.limits["max_tool_calls"] - self.calls
+                        )
+                        if result["remaining_tool_calls"] == 0:
+                            result["budget_hint"] = (
+                                "No tool calls remain. Give a final answer using verified results; clearly state anything incomplete."
+                            )
                     await self.repository.end_span(
                         span,
                         execution["status"],
@@ -171,16 +196,18 @@ class ExecutionMiddleware(AgentMiddleware):
                     return ToolMessage(
                         content=content,
                         tool_call_id=call["id"],
-                        status="success"
-                        if execution["status"] == "success"
-                        else "error",
+                        status=(
+                            "success" if execution["status"] == "success" else "error"
+                        ),
                     )
             except McpConnectionError as error:
                 result = {
                     "status": "invalid" if error.status == 422 else "blocked",
-                    "error_code": "invalid_arguments"
-                    if error.status == 422
-                    else "tool_unavailable",
+                    "error_code": (
+                        "invalid_arguments"
+                        if error.status == 422
+                        else "tool_unavailable"
+                    ),
                 }
                 if error.status != 422:
                     self.stop_reason = "tool_unavailable"
@@ -190,7 +217,11 @@ class ExecutionMiddleware(AgentMiddleware):
                     raise RuntimeStop("tool_unavailable") from None
             except ValidationError:
                 result = {"status": "invalid", "error_code": "invalid_arguments"}
-            except RuntimeStop:
+            except RuntimeStop as error:
+                if builtin:
+                    await self.repository.end_span(
+                        span, "error", error_code=error.reason
+                    )
                 raise
             except asyncio.CancelledError:
                 self.stop_reason = "interrupted"

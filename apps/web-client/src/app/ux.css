@@ -216,27 +216,6 @@
 	font-size: 20px;
 	margin: 20px 0;
 }
-.configuration-review dl {
-	margin: 0;
-}
-.configuration-review dl > div {
-	display: grid;
-	grid-template-columns: 140px minmax(0, 1fr);
-	gap: 16px;
-	padding: 10px 0;
-	border-bottom: 1px solid var(--line);
-}
-.configuration-review dt {
-	color: var(--muted);
-}
-.configuration-review dd {
-	margin: 0;
-	overflow-wrap: anywhere;
-}
-.configuration-review p {
-	color: var(--muted);
-	margin-top: 16px;
-}
 .advanced-settings {
 	border-top: 1px solid var(--line);
 	margin: 20px 0;
@@ -407,7 +386,6 @@
 	.agent-page-panel .mcp-sheet-header {
 		padding: 16px;
 	}
-	.configuration-review dl > div,
 	.readable-output-fields > div {
 		grid-template-columns: 1fr;
 		gap: 4px;
