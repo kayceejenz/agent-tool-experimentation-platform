@@ -1,6 +1,7 @@
 """Record model/tool steps and enforce execution budgets."""
 
 import asyncio
+import logging
 from uuid import UUID, uuid5
 
 from langchain.agents.middleware import AgentMiddleware
@@ -15,6 +16,8 @@ from integrations.agents.runtime_messages import (
     model_tool_result,
     visible_text,
 )
+
+logger = logging.getLogger("agent.worker")
 
 # Character ceilings bound payload growth; these are not token estimates.
 MAX_TOOL_CONTEXT_CHARS = 24_000
@@ -81,6 +84,7 @@ class ExecutionMiddleware(AgentMiddleware):
             },
         )
         self.model_span = span
+        logger.info("Run %s model turn %s started", self.run["id"], self.turns)
         try:
             response = await handler(request)
             messages = [
@@ -99,12 +103,16 @@ class ExecutionMiddleware(AgentMiddleware):
                 for m in messages
             ]
             await self.repository.end_span(span, "success", outputs)
+            logger.info("Run %s model turn %s finished", self.run["id"], self.turns)
             return response
         except asyncio.CancelledError:
             await self.repository.end_span(span, "unknown", error_code="interrupted")
             raise
         except Exception as error:
             category, details = model_failure(error)
+            logger.warning(
+                "Run %s model turn %s failed: %s", self.run["id"], self.turns, category
+            )
             await self.repository.end_span(
                 span, "error", outputs=details, error_code=category
             )
@@ -139,8 +147,13 @@ class ExecutionMiddleware(AgentMiddleware):
                 context_span_ids=self.model_context,
                 inputs=call["args"],
             )
+            # Only log registered tool names, never model-supplied arguments or names.
+            name = tool["name"] if tool else "unrecognized"
+            outcome = "error"
+            logger.info("Run %s tool %r started", self.run["id"], name)
             try:
                 if not tool:
+                    outcome = "invalid"
                     result = {"status": "invalid", "error_code": "tool_not_allowed"}
                 else:
                     if builtin:
@@ -163,6 +176,7 @@ class ExecutionMiddleware(AgentMiddleware):
                             UUID(tool["id"]),
                             body,
                         )
+                    outcome = execution["status"]
                     result = {
                         "status": execution["status"],
                         "result": execution.get("result"),
@@ -201,6 +215,7 @@ class ExecutionMiddleware(AgentMiddleware):
                         ),
                     )
             except McpConnectionError as error:
+                outcome = "invalid" if error.status == 422 else "blocked"
                 result = {
                     "status": "invalid" if error.status == 422 else "blocked",
                     "error_code": (
@@ -216,6 +231,7 @@ class ExecutionMiddleware(AgentMiddleware):
                     )
                     raise RuntimeStop("tool_unavailable") from None
             except ValidationError:
+                outcome = "invalid"
                 result = {"status": "invalid", "error_code": "invalid_arguments"}
             except RuntimeStop as error:
                 if builtin:
@@ -224,6 +240,7 @@ class ExecutionMiddleware(AgentMiddleware):
                     )
                 raise
             except asyncio.CancelledError:
+                outcome = "interrupted"
                 self.stop_reason = "interrupted"
                 await self.repository.end_span(
                     span, "unknown", error_code="interrupted"
@@ -234,6 +251,10 @@ class ExecutionMiddleware(AgentMiddleware):
                     span, "error", error_code="executor_error"
                 )
                 raise
+            finally:
+                logger.info(
+                    "Run %s tool %r finished: %s", self.run["id"], name, outcome
+                )
             await self.repository.end_span(
                 span, result["status"], result, result["error_code"]
             )

@@ -1,6 +1,8 @@
 """Build and run the LangChain agent using controlled tool middleware."""
 
 import asyncio
+import logging
+import time
 
 from langchain.agents import create_agent
 from langchain_core.tools import StructuredTool
@@ -14,6 +16,9 @@ from integrations.agents.model_provider import configured_secrets, provider_opti
 from integrations.agents.runtime_errors import RuntimeStop
 from integrations.agents.runtime_messages import runtime_instructions, visible_text
 from integrations.sandbox.tools import WorkspaceTools
+
+
+logger = logging.getLogger("agent.worker")
 
 
 async def blocked_dispatch(**kwargs):
@@ -99,13 +104,16 @@ class LangChainRuntime:
         return visible_text(result["messages"][-1])
 
     async def execute(self, run):
+        started = time.monotonic()
         status, reason, answer = "failed", "runtime_error", None
         workspace = None
         try:
             async with asyncio.timeout(run["snapshot"]["limits"]["timeout_seconds"]):
                 if run["snapshot"].get("analysis"):
                     workspace = WorkspaceTools(run, self.repository, self.settings)
+                    logger.info("Run %s preparing sandbox", run["id"])
                     await workspace.prepare()
+                    logger.info("Run %s sandbox ready", run["id"])
                 answer = await self.invoke(run, workspace)
                 status, reason = "completed", "final_answer"
         except RuntimeStop as error:
@@ -118,9 +126,7 @@ class LangChainRuntime:
             status = (
                 "cancelled"
                 if reason == "cancelled"
-                else "failed"
-                if reason == "access_revoked"
-                else "interrupted"
+                else "failed" if reason == "access_revoked" else "interrupted"
             )
         except AgentError:
             reason = "access_revoked"
@@ -130,9 +136,20 @@ class LangChainRuntime:
         finally:
             if workspace:
                 try:
+                    logger.info(
+                        "Run %s collecting outputs and closing sandbox", run["id"]
+                    )
                     await workspace.finish(collect=status == "completed")
                 except RuntimeStop as error:
                     status, reason = "failed", error.reason
                 except Exception:
                     status, reason = "failed", "sandbox_cleanup_failed"
         await self.repository.finish(run["id"], status, reason, answer)
+        logger.log(
+            logging.INFO if status == "completed" else logging.WARNING,
+            "Run %s %s: %s (%.1fs)",
+            run["id"],
+            status,
+            reason,
+            time.monotonic() - started,
+        )

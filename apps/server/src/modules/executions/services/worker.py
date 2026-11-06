@@ -1,6 +1,7 @@
 """Bounded PostgreSQL queue worker. Start with agent-platform-worker."""
 
 import asyncio
+import logging
 
 from core.settings import Settings
 from integrations.agents.langchain_runtime import LangChainRuntime
@@ -18,6 +19,9 @@ from modules.tools.repos.tool_repo import ToolRepository
 from modules.tools.services.tool_service import ToolService
 
 
+logger = logging.getLogger("agent.worker")
+
+
 async def supervise(runtime, repository, run):
     task = asyncio.create_task(runtime.execute(run))
     try:
@@ -32,6 +36,7 @@ async def supervise(runtime, repository, run):
                 run["_worker_stop"] = (
                     "cancelled" if isinstance(error, RuntimeStop) else "access_revoked"
                 )
+                logger.info("Run %s stopping: %s", run["id"], run["_worker_stop"])
                 task.cancel()
                 await task
                 return
@@ -43,6 +48,7 @@ async def supervise(runtime, repository, run):
 
 
 async def serve():
+    logger.info("Worker starting")
     settings = Settings()
     database = Database(settings)
     repository = ExecutionRepository(
@@ -57,6 +63,7 @@ async def serve():
     )
     runtime = LangChainRuntime(repository, executor, settings)
     await database.open()
+    logger.info("Database connected")
     evaluation_task = None
     try:
         if not await database.is_ready():
@@ -70,6 +77,7 @@ async def serve():
             )
             # Surface evaluator failure even when the execution queue is idle.
             evaluation_task.add_done_callback(lambda _: notifications.executions.set())
+            logger.info("Worker ready; waiting for execution and evaluation jobs")
             while True:
                 notifications.executions.clear()
                 if evaluation_task.done():
@@ -78,6 +86,7 @@ async def serve():
                     await notifications.task
                 run = await repository.claim()
                 if run:
+                    logger.info("Run %s picked up", run["id"])
                     await supervise(runtime, repository, run)
                 else:
                     await wait_for_work(notifications.executions)
@@ -89,9 +98,16 @@ async def serve():
             except asyncio.CancelledError:
                 pass
         await database.close()
+        logger.info("Worker stopped")
 
 
 def main():
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    logger.setLevel(logging.INFO)
     try:
         asyncio.run(serve())
     except KeyboardInterrupt:

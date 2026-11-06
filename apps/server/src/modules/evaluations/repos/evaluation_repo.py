@@ -1,3 +1,4 @@
+import logging
 from uuid import uuid4
 
 from core.serialization import json_value
@@ -7,6 +8,9 @@ from psycopg.types.json import Jsonb
 from modules.agents.models.error_model import AgentError
 from modules.agents.repos.agent_repo import AgentRepository
 from modules.tools.helpers.validation import redact
+
+
+logger = logging.getLogger("agent.worker")
 
 
 class EvaluationRepository:
@@ -191,3 +195,11 @@ class EvaluationRepository:
                     job["id"],
                 ),
             )
+
+        logger.log(
+            logging.INFO if status == "completed" else logging.WARNING,
+            "Evaluation %s %s: %s",
+            job["id"],
+            status,
+            error_code or "done",
+        )

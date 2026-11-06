@@ -1,6 +1,7 @@
 """Orchestrate bounded evaluation of persisted evidence; never dispatch agent tools."""
 
 import asyncio
+import logging
 
 from integrations.agents.model_provider import (
     provider_for_model,
@@ -18,6 +19,9 @@ from modules.evaluations.helpers.evidence import prepare_evaluation
 from modules.evaluations.helpers.reports import unknown_report, validate_report
 
 
+logger = logging.getLogger("agent.worker")
+
+
 class Evaluator:
     def __init__(self, repository, settings, model_factory=None):
         self.repository, self.settings, self.model_factory = (
@@ -27,6 +31,7 @@ class Evaluator:
         )
 
     async def execute(self, job):
+        logger.info("Evaluation %s started", job.get("id", "unassigned"))
         metrics = evidence_hash = None
         usage = None
         try:
