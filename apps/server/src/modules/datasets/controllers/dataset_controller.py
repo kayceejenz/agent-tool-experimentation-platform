@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from api.dependencies import Config, User
 from fastapi import APIRouter, HTTPException, Query, Request
+from integrations.object_storage import object_storage
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.formparsers import MultiPartException
@@ -17,7 +18,11 @@ router = APIRouter(prefix="/projects/{project_id}/datasets", tags=["datasets"])
 def resources(request, config):
     return (
         DatasetRepository(request.app.state.database),
-        DatasetStorage(config.dataset_storage_root, config.dataset_file_limit_bytes),
+        DatasetStorage(
+            config.dataset_storage_root,
+            config.dataset_file_limit_bytes,
+            object_storage(config),
+        ),
     )
 
 
@@ -86,7 +91,7 @@ async def upload(project_id: UUID, request: Request, user: User, config: Config)
         raise
     finally:
         if not committed:
-            storage.remove(dataset_id)
+            await asyncio.to_thread(storage.remove, dataset_id)
 
 
 @router.get("/{dataset_id}")

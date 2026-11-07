@@ -2,12 +2,14 @@
 
 import asyncio
 import copy
+import hashlib
 import json
+import shutil
+from contextlib import AsyncExitStack
 from dataclasses import asdict
 from datetime import datetime, timezone
-from uuid import uuid4
-import hashlib
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import HTTPException
 from jsonschema import ValidationError, validate
@@ -15,6 +17,7 @@ from modules.datasets.repos.dataset_repo import DatasetRepository
 from modules.datasets.services.file_storage import DatasetStorage
 
 from integrations.agents.runtime_errors import RuntimeStop
+from integrations.object_storage import StorageUnavailable, object_storage
 from integrations.sandbox.runner import (
     SandboxError,
     SandboxPolicy,
@@ -80,6 +83,8 @@ def tool_definitions():
 
 
 async def image_identity(settings):
+    if settings.sandbox_image_id:
+        return settings.sandbox_image_id
     try:
         status, output, _ = await process(
             ["image", "inspect", settings.sandbox_image, "--format", "{{.Id}}"],
@@ -118,16 +123,12 @@ class WorkspaceTools:
             for file in expected
         ):
             raise RuntimeStop("dataset_changed")
-        storage = DatasetStorage(self.settings.dataset_storage_root)
+        storage = DatasetStorage(
+            self.settings.dataset_storage_root,
+            self.settings.dataset_file_limit_bytes,
+            object_storage(self.settings),
+        )
         try:
-            files = [
-                {
-                    "source": storage.path(dataset["id"], file["id"]),
-                    "name": file["name"],
-                    "expected_hash": file["sha256"],
-                }
-                for file in expected
-            ]
             runner = SandboxRunner(
                 self.settings.sandbox_storage_root,
                 SandboxPolicy(
@@ -138,10 +139,32 @@ class WorkspaceTools:
                         self.run["snapshot"]["limits"]["timeout_seconds"],
                     ),
                     output_bytes=1500,
+                    memory_mb=self.settings.sandbox_memory_mb,
+                    cpus=self.settings.sandbox_cpus,
                 ),
             )
-            self.session = await runner.open(files)
-        except (SandboxError, ValueError, OSError, HTTPException, TimeoutError):
+            async with AsyncExitStack() as inputs:
+                files = []
+                for file in expected:
+                    path = await inputs.enter_async_context(
+                        storage.materialize(dataset["id"], file["id"])
+                    )
+                    files.append(
+                        {
+                            "source": path,
+                            "name": file["name"],
+                            "expected_hash": file["sha256"],
+                        }
+                    )
+                self.session = await runner.open(files)
+        except (
+            SandboxError,
+            StorageUnavailable,
+            ValueError,
+            OSError,
+            HTTPException,
+            TimeoutError,
+        ):
             raise RuntimeStop("sandbox_unavailable") from None
 
     async def execute(self, tool, arguments):
@@ -237,6 +260,16 @@ print('Preview truncated:', len(data) > {arguments.get("max_bytes", 1024)})
                     }
                 )
                 total += len(raw)
+            remote = object_storage(self.settings)
+            if remote is not None:
+                for file in artifacts:
+                    key = (
+                        "artifacts/"
+                        + self.session.workspace.id
+                        + "/"
+                        + Path(file["path"]).name
+                    )
+                    await asyncio.to_thread(remote.upload, key, file["path"])
             await self.repository.record_analysis_result(
                 self.run["id"],
                 {
@@ -258,10 +291,12 @@ print('Preview truncated:', len(data) > {arguments.get("max_bytes", 1024)})
                     ],
                 },
             )
-        except (SandboxError, OSError, TimeoutError):
+        except (SandboxError, StorageUnavailable, OSError, TimeoutError):
             raise RuntimeStop("artifact_collection_failed") from None
         finally:
             try:
                 await asyncio.shield(self.session.close())
+                if self.settings.file_storage_backend == "r2":
+                    await asyncio.to_thread(shutil.rmtree, self.session.workspace.path)
             except (SandboxError, OSError, TimeoutError):
                 raise RuntimeStop("sandbox_cleanup_failed") from None

@@ -1,0 +1,156 @@
+name: Deploy Agent Backend
+
+on:
+        push:
+                branches: [main]
+                paths:
+                        - 'apps/server/**'
+                        - '.github/scripts/**'
+                        - '.github/workflows/ci.yml'
+                        - '.github/workflows/deploy-backend.yml'
+        workflow_dispatch:
+
+permissions:
+        contents: read
+
+concurrency:
+        group: agent-backend-production
+        cancel-in-progress: false
+
+jobs:
+        validate:
+                uses: ./.github/workflows/ci.yml
+
+        build:
+                name: Build and Publish Both Images
+                needs: validate
+                if: github.ref == 'refs/heads/main'
+                runs-on: ubuntu-latest
+                timeout-minutes: 20
+                permissions:
+                        contents: read
+                        id-token: write
+                outputs:
+                        app_image: ${{ steps.refs.outputs.app_image }}
+                        sandbox_image: ${{ steps.refs.outputs.sandbox_image }}
+                env:
+                        ECR_REPOSITORY_URI: ${{ vars.ECR_REPOSITORY_URI }}
+                steps:
+                        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                          with:
+                                  persist-credentials: false
+                        - name: Validate deployment configuration
+                          env:
+                                  ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+                                  REGION: ${{ vars.AWS_REGION }}
+                          run: |
+                                  test -n "$ROLE_ARN" && test -n "$REGION"
+                                  [[ "$ECR_REPOSITORY_URI" =~ ^339712836282\.dkr\.ecr\.eu-north-1\.amazonaws\.com/agent-app$ ]]
+                        - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+                          with:
+                                  role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+                                  aws-region: ${{ vars.AWS_REGION }}
+                                  allowed-account-ids: '339712836282'
+                        - uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+                        - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+                        - name: Build and push application
+                          id: app
+                          uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+                          with:
+                                  context: apps/server
+                                  platforms: linux/amd64
+                                  push: true
+                                  tags: ${{ vars.ECR_REPOSITORY_URI }}:app-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+                                  cache-from: type=gha,scope=agent-app
+                                  cache-to: type=gha,scope=agent-app,mode=max
+                        - name: Build and push sandbox
+                          id: sandbox
+                          uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+                          with:
+                                  context: apps/server/sandbox
+                                  platforms: linux/amd64
+                                  push: true
+                                  tags: ${{ vars.ECR_REPOSITORY_URI }}:sandbox-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+                                  cache-from: type=gha,scope=agent-analysis
+                                  cache-to: type=gha,scope=agent-analysis,mode=max
+                        - name: Export immutable image references
+                          id: refs
+                          env:
+                                  APP_DIGEST: ${{ steps.app.outputs.digest }}
+                                  SANDBOX_DIGEST: ${{ steps.sandbox.outputs.digest }}
+                          run: |
+                                  echo "app_image=$ECR_REPOSITORY_URI@$APP_DIGEST" >> "$GITHUB_OUTPUT"
+                                  echo "sandbox_image=$ECR_REPOSITORY_URI@$SANDBOX_DIGEST" >> "$GITHUB_OUTPUT"
+
+        deploy:
+                name: Deploy Only Agent Services
+                needs: build
+                if: github.ref == 'refs/heads/main'
+                runs-on: ubuntu-latest
+                timeout-minutes: 20
+                permissions:
+                        contents: read
+                        id-token: write
+                env:
+                        EC2_HOST: ${{ vars.AWS_EC2_HOST }}
+                        EC2_USER: ${{ vars.AWS_EC2_USER }}
+                        AWS_REGION: ${{ vars.AWS_REGION }}
+                        ECR_REPOSITORY_URI: ${{ vars.ECR_REPOSITORY_URI }}
+                        RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+                        APP_IMAGE: ${{ needs.build.outputs.app_image }}
+                        SANDBOX_IMAGE: ${{ needs.build.outputs.sandbox_image }}
+                steps:
+                        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                          with:
+                                  persist-credentials: false
+                        - name: Verify this is still the latest main commit
+                          env:
+                                  GH_TOKEN: ${{ github.token }}
+                          run: |
+                                  latest=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+                                  test "$latest" = "$GITHUB_SHA"
+                        - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+                          with:
+                                  role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+                                  aws-region: ${{ vars.AWS_REGION }}
+                                  allowed-account-ids: '339712836282'
+                        - name: Configure pinned SSH connection
+                          env:
+                                  SSH_KEY: ${{ secrets.AWS_EC2_SSH_KEY }}
+                                  KNOWN_HOSTS: ${{ vars.AWS_EC2_KNOWN_HOSTS }}
+                          run: |
+                                  [[ "$EC2_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]
+                                  [[ "$EC2_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+                                  test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+                                  umask 077
+                                  mkdir -p "$HOME/.ssh"
+                                  printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/agent_deploy"
+                                  printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+                                  ssh-keygen -y -f "$HOME/.ssh/agent_deploy" > /dev/null
+                        - name: Upload release scripts and log in to ECR
+                          run: |
+                                  ssh_opts=(-i "$HOME/.ssh/agent_deploy" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+                                  release="/opt/agent-platform/releases/$RELEASE_ID"
+                                  auth="/opt/agent-platform/registry-auth/$RELEASE_ID"
+                                  registry="${ECR_REPOSITORY_URI%%/*}"
+                                  # shellcheck disable=SC2029
+                                  ssh "${ssh_opts[@]}" "$EC2_USER@$EC2_HOST" "mkdir -p '$release' && chmod 755 '$release' && sudo -n install -d -m 700 '$auth'"
+                                  scp "${ssh_opts[@]}" apps/server/docker-compose.production.yml "$EC2_USER@$EC2_HOST:$release/compose.yml"
+                                  scp "${ssh_opts[@]}" .github/scripts/{deploy.sh,prepare_runtime.py,check_runtime.py} "$EC2_USER@$EC2_HOST:$release/"
+                                  # shellcheck disable=SC2029
+                                  aws ecr get-login-password --region "$AWS_REGION" | \
+                                    ssh "${ssh_opts[@]}" "$EC2_USER@$EC2_HOST" "sudo -n docker --config '$auth' login --username AWS --password-stdin '$registry'"
+                        - name: Migrate, drain and deploy agent services
+                          run: |
+                                  ssh -i "$HOME/.ssh/agent_deploy" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+                                    "$EC2_USER@$EC2_HOST" \
+                                    "bash '/opt/agent-platform/releases/$RELEASE_ID/deploy.sh' '$RELEASE_ID' '$APP_IMAGE' '$SANDBOX_IMAGE'"
+                        - name: Remove temporary registry credentials
+                          if: always()
+                          run: |
+                                  if [[ -f "$HOME/.ssh/agent_deploy" && -n "$EC2_HOST" && -n "$EC2_USER" ]]; then
+                                    auth="/opt/agent-platform/registry-auth/$RELEASE_ID"
+                                    ssh -i "$HOME/.ssh/agent_deploy" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+                                      "$EC2_USER@$EC2_HOST" "sudo -n rm -f '$auth/config.json'; sudo -n rmdir '$auth' 2>/dev/null || true" || true
+                                  fi
+                                  rm -f "$HOME/.ssh/agent_deploy"

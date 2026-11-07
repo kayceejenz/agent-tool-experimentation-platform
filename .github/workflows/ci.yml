@@ -1,0 +1,100 @@
+name: Continuous Integration
+
+on:
+        pull_request:
+                branches: [main]
+                paths:
+                        - 'apps/server/**'
+                        - 'apps/web-client/**'
+                        - '.github/scripts/**'
+                        - '.github/workflows/**'
+        push:
+                branches: [main]
+                # Backend pushes run these checks through the reusable deployment gate.
+                paths: ['apps/web-client/**']
+        workflow_call:
+        workflow_dispatch:
+
+permissions:
+        contents: read
+
+jobs:
+        backend:
+                name: Backend and Sandbox Tests
+                runs-on: ubuntu-latest
+                timeout-minutes: 20
+                services:
+                        postgres:
+                                image: postgres:17-alpine
+                                env:
+                                        POSTGRES_USER: postgres
+                                        POSTGRES_PASSWORD: ci-postgres-only
+                                        POSTGRES_DB: agent_ci_test
+                                ports: ['5432:5432']
+                                options: >-
+                                        --health-cmd 'pg_isready -U postgres -d agent_ci_test'
+                                        --health-interval 5s --health-timeout 5s --health-retries 10
+                env:
+                        AGENT_TEST_DATABASE_URL: postgresql://postgres:ci-postgres-only@127.0.0.1:5432/agent_ci_test
+                        RUN_SANDBOX_TESTS: '1'
+                steps:
+                        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                          with:
+                                  persist-credentials: false
+                        - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+                          with:
+                                  python-version: '3.12'
+                        - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+                          with:
+                                  version: '0.12.5'
+                                  enable-cache: true
+                                  cache-dependency-glob: apps/server/uv.lock
+                        - name: Install locked backend dependencies
+                          run: uv sync --frozen --project apps/server
+                        - name: Lint and compile backend and deployment helpers
+                          run: |
+                                  uv run --frozen --project apps/server ruff check --select E4,E7,E9,F apps/server/src .github/scripts
+                                  uv run --frozen --project apps/server python -m compileall -q apps/server/src .github/scripts
+                                  bash -n .github/scripts/deploy.sh
+                        - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+                        - name: Build analysis image for real sandbox tests
+                          uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+                          with:
+                                  context: apps/server/sandbox
+                                  load: true
+                                  tags: agent-analysis:phase2
+                                  platforms: linux/amd64
+                                  cache-from: type=gha,scope=agent-analysis
+                                  cache-to: type=gha,scope=agent-analysis,mode=max
+                        - name: Prepare test-only runtime role
+                          run: |
+                                  uv run --frozen --project apps/server python - <<'PYTEST'
+                                  import os
+                                  import psycopg
+                                  with psycopg.connect(os.environ["AGENT_TEST_DATABASE_URL"], autocommit=True) as db:
+                                      db.execute("CREATE ROLE agent_platform_api NOLOGIN")
+                                  PYTEST
+                        - name: Run unit, PostgreSQL integration and Docker tests
+                          run: uv run --frozen --project apps/server pytest apps/server/tests -q
+
+        frontend:
+                name: Frontend Checks
+                runs-on: ubuntu-latest
+                timeout-minutes: 15
+                defaults:
+                        run:
+                                working-directory: apps/web-client
+                steps:
+                        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                          with:
+                                  persist-credentials: false
+                        - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+                          with:
+                                  node-version: '24'
+                        - name: Install pinned pnpm and dependencies
+                          run: |
+                                  npm install --global pnpm@10.33.4
+                                  pnpm install --frozen-lockfile
+                        - run: pnpm lint --max-warnings=0
+                        - run: pnpm typecheck
+                        - run: pnpm build

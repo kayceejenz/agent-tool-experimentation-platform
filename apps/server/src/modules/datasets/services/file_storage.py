@@ -1,18 +1,22 @@
 """Immutable UUID-addressed inputs; original filenames are display metadata only."""
 
+import asyncio
 import csv
 import hashlib
 import io
 import shutil
+import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import HTTPException
 
 
 class DatasetStorage:
-    def __init__(self, root, file_limit=64 * 1024 * 1024):
+    def __init__(self, root, file_limit=64 * 1024 * 1024, remote=None):
         self.root = Path(root).resolve()
         self.file_limit = file_limit
+        self.remote = remote
 
     @staticmethod
     def filename(name):
@@ -36,6 +40,28 @@ class DatasetStorage:
             raise HTTPException(404, "Dataset file unavailable")
         return path
 
+    @staticmethod
+    def key(dataset_id, file_id=None):
+        from uuid import UUID
+
+        key = "datasets/" + str(UUID(str(dataset_id)))
+        return key if file_id is None else key + "/" + str(UUID(str(file_id)))
+
+    @asynccontextmanager
+    async def materialize(self, dataset_id, file_id):
+        if self.remote is None:
+            yield self.path(dataset_id, file_id)
+            return
+        with tempfile.TemporaryDirectory(prefix="agent-input-") as directory:
+            path = Path(directory) / str(file_id)
+            await asyncio.to_thread(
+                self.remote.download,
+                self.key(dataset_id, file_id),
+                path,
+                self.file_limit,
+            )
+            yield path
+
     async def save(self, dataset_id, file_id, upload):
         path = self.path(dataset_id, file_id)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,6 +79,14 @@ class DatasetStorage:
             if not size:
                 raise HTTPException(422, "Empty CSV files are not supported")
             path.chmod(0o400)
+            if self.remote is not None:
+                # Validate before publishing; never keep a cloud upload as local truth.
+                await asyncio.to_thread(self.preview_path, path)
+                await asyncio.to_thread(
+                    self.remote.upload, self.key(dataset_id, file_id), path, "text/csv"
+                )
+                path.unlink()
+                path.parent.rmdir()
             return {"size_bytes": size, "sha256": digest.hexdigest()}
         except BaseException:
             path.unlink(missing_ok=True)
@@ -61,6 +95,8 @@ class DatasetStorage:
     def remove(self, dataset_id, strict=False):
         from uuid import UUID
 
+        if self.remote is not None:
+            self.remote.delete_prefix(self.key(dataset_id))
         directory = self.root / str(UUID(str(dataset_id)))
         if directory.is_symlink():
             raise HTTPException(404, "Dataset unavailable")
@@ -77,12 +113,27 @@ class DatasetStorage:
             shutil.rmtree(directory, ignore_errors=True)
 
     def preview(self, dataset_id, file_id):
-        path = self.path(dataset_id, file_id)
+        if self.remote is not None:
+            try:
+                raw = self.remote.read(
+                    self.key(dataset_id, file_id), 256 * 1024 + 1, preview=True
+                )
+            except FileNotFoundError:
+                raise HTTPException(404, "Dataset file unavailable") from None
+            return self.parse_preview(raw)
+        return self.preview_path(self.path(dataset_id, file_id))
+
+    @staticmethod
+    def preview_path(path):
         try:
             with path.open("rb") as source:
                 raw = source.read(256 * 1024 + 1)
         except FileNotFoundError:
             raise HTTPException(404, "Dataset file unavailable") from None
+        return DatasetStorage.parse_preview(raw)
+
+    @staticmethod
+    def parse_preview(raw):
         truncated = len(raw) > 256 * 1024
         raw = raw[: 256 * 1024]
         if truncated:

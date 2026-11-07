@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from core.settings import Settings
+
 from integrations.sandbox.runner import SandboxError, SandboxPolicy, SandboxRunner
 
 
@@ -14,6 +15,8 @@ async def run(args):
     settings = Settings()
     policy = SandboxPolicy(
         image=args.image or settings.sandbox_image,
+        memory_mb=settings.sandbox_memory_mb,
+        cpus=settings.sandbox_cpus,
         command_seconds=(
             args.timeout
             if args.timeout is not None

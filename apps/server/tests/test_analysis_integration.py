@@ -4,10 +4,9 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from integrations.agents.langchain_runtime import LangChainRuntime
 from langchain_core.messages import AIMessage
 from pydantic import SecretStr
-
-from integrations.agents.langchain_runtime import LangChainRuntime
 from test_agent_runtime import ScriptedModel
 from test_projects_integration import create, query, workspace  # noqa: F401
 
@@ -76,7 +75,7 @@ def call(name, arguments, identifier):
 
 def enqueue(client, project, agent, dataset, headers, request_id=None):
     return client.post(
-        f'/api/v1/projects/{project}/agents/{agent["id"]}/executions',
+        f"/api/v1/projects/{project}/agents/{agent['id']}/executions",
         headers=headers,
         json={
             "revision": 1,
@@ -250,7 +249,7 @@ def test_analysis_access_idempotency_and_changed_inputs(analysis_workspace):
     response = enqueue(client, project, agent, dataset, owner, request)
     assert response.status_code == 202
     without = client.post(
-        f'/api/v1/projects/{project}/agents/{agent["id"]}/executions',
+        f"/api/v1/projects/{project}/agents/{agent['id']}/executions",
         headers=owner,
         json={
             "revision": 1,
@@ -274,7 +273,7 @@ def test_analysis_access_idempotency_and_changed_inputs(analysis_workspace):
 
     client.portal.call(execute)
     detail = client.get(
-        f'/api/v1/projects/{project}/executions/{response.json()["id"]}', headers=owner
+        f"/api/v1/projects/{project}/executions/{response.json()['id']}", headers=owner
     ).json()
     assert (
         detail["status"] == "failed"
@@ -316,3 +315,90 @@ def test_failed_run_retains_partial_exports_with_authorized_access(analysis_work
     files = client.get(path + "/artifacts", headers=owner).json()["items"]
     assert {item["name"] for item in files} == {"partial.csv", "analysis_step_01.py"}
     assert all(item["availability"] == "available" for item in files)
+
+
+def test_remote_dataset_analysis_survives_local_workspace_cleanup(
+    analysis_workspace, monkeypatch
+):
+    from integrations.object_storage import R2Storage
+    from test_object_storage import MemoryS3
+
+    client, config, users, project, agent, _ = analysis_workspace
+    remote = R2Storage(MemoryS3(), "test-private", "agent-platform")
+    monkeypatch.setattr("integrations.object_storage._r2", lambda *args: remote)
+    config.file_storage_backend = "r2"
+    config.r2_endpoint_url = "https://test.r2.cloudflarestorage.com"
+    config.r2_bucket_name = "test-private"
+    config.r2_access_key_id = SecretStr("fake")
+    config.r2_secret_access_key = SecretStr("fake")
+    # Exercise the lower memory policy intended for a small cloud prototype.
+    config.sandbox_memory_mb = 512
+    config.sandbox_cpus = 0.5
+    owner = users[0][1]
+    base = f"/api/v1/projects/{project}"
+    uploaded = client.post(
+        base + "/datasets",
+        headers=owner,
+        data={"name": "Cloud trial"},
+        files={"files": ("events.csv", b"animal,value\n001,42\n")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    dataset = uploaded.json()
+    assert not (Path(config.dataset_storage_root) / dataset["id"]).exists()
+    preview = client.get(
+        base + f"/datasets/{dataset['id']}/files/{dataset['files'][0]['id']}/preview",
+        headers=owner,
+    )
+    assert preview.json()["rows"] == [["001", "42"]]
+    queued = enqueue(client, project, agent, dataset, owner)
+    assert queued.status_code == 202, queued.text
+    model = ScriptedModel(
+        responses=[
+            call(
+                "execute_python",
+                {
+                    "code": "import pandas as pd; import matplotlib.pyplot as plt; df=pd.read_csv('/input/events.csv'); print(int(df.value.sum())); df.to_csv('/work/output/result.csv',index=False); plt.bar(['total'],[int(df.value.sum())]); plt.savefig('/work/output/chart.png')"
+                },
+                "calculate",
+            ),
+            AIMessage(content="Total is 42."),
+        ]
+    )
+
+    async def execute():
+        repo = client.app.state.executions
+        run = await repo.claim()
+        await LangChainRuntime(
+            repo, client.app.state.tools, config, lambda _: model
+        ).execute(run)
+
+    client.portal.call(execute)
+    url = base + "/executions/" + queued.json()["id"]
+    run = client.get(url, headers=owner).json()
+    assert run["status"] == "completed", run
+    result = run["snapshot"]["analysis_result"]
+    assert not (
+        Path(config.sandbox_storage_root) / "sessions" / result["session_id"]
+    ).exists()
+    files = client.get(url + "/artifacts", headers=owner).json()["items"]
+    assert len(files) == 3 and all(
+        item["availability"] == "available" for item in files
+    )
+    csv_file = next(item for item in files if item["name"] == "result.csv")
+    assert client.get(
+        url + "/artifacts/" + csv_file["id"] + "/preview", headers=owner
+    ).json()["rows"] == [["1", "42"]]
+    assert (
+        client.get(
+            url + "/artifacts/" + csv_file["id"], headers=users[3][1]
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(base + "/datasets/" + dataset["id"], headers=owner).status_code
+        == 200
+    )
+    assert (
+        client.get(url + "/artifacts/" + csv_file["id"], headers=owner).status_code
+        == 200
+    )

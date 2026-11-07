@@ -13,6 +13,8 @@ from pathlib import Path
 
 from modules.agents.models.error_model import AgentError
 
+from integrations.object_storage import StorageUnavailable, object_storage
+
 TYPES = {
     ".png": "image/png",
     ".csv": "text/csv",
@@ -27,6 +29,7 @@ MAX_BYTES = 16 * 1024 * 1024
 class ArtifactStorage:
     def __init__(self, settings):
         self.root = Path(settings.sandbox_storage_root).resolve() / "sessions"
+        self.remote = object_storage(settings)
         self.retention = settings.sandbox_artifact_retention_days
 
     def expiry(self, execution):
@@ -69,19 +72,30 @@ class ArtifactStorage:
 
     def read(self, execution, identifier):
         item, path = self.registered(execution, identifier)
-        try:
-            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-            with os.fdopen(descriptor, "rb") as source:
-                info = os.fstat(source.fileno())
-                if (
-                    not stat.S_ISREG(info.st_mode)
-                    or info.st_size != item["size_bytes"]
-                    or info.st_size > MAX_BYTES
-                ):
-                    raise AgentError(404, "Generated file unavailable")
-                data = source.read(MAX_BYTES + 1)
-        except OSError:
-            raise AgentError(404, "Generated file unavailable") from None
+        if self.remote is not None:
+            session = execution["analysis_result"]["session_id"]
+            try:
+                data = self.remote.read(
+                    "artifacts/" + session + "/" + identifier, MAX_BYTES
+                )
+            except FileNotFoundError:
+                raise AgentError(404, "Generated file unavailable") from None
+            except StorageUnavailable:
+                raise AgentError(503, "File storage unavailable") from None
+        else:
+            try:
+                descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(descriptor, "rb") as source:
+                    info = os.fstat(source.fileno())
+                    if (
+                        not stat.S_ISREG(info.st_mode)
+                        or info.st_size != item["size_bytes"]
+                        or info.st_size > MAX_BYTES
+                    ):
+                        raise AgentError(404, "Generated file unavailable")
+                    data = source.read(MAX_BYTES + 1)
+            except OSError:
+                raise AgentError(404, "Generated file unavailable") from None
         if len(data) != item["size_bytes"] or (
             item.get("sha256") and hashlib.sha256(data).hexdigest() != item["sha256"]
         ):

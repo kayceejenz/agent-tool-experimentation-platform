@@ -25,8 +25,22 @@ class Settings(BaseSettings):
     # Download availability window; physical cleanup remains operator-managed.
     sandbox_artifact_retention_days: int = Field(default=7, ge=1, le=365)
     sandbox_image: str = "agent-analysis:phase2"
+    # Production pins this after loading the image; the API needs no Docker socket.
+    sandbox_image_id: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
     sandbox_command_seconds: int = Field(default=60, ge=1, le=300)
     sandbox_session_seconds: int = Field(default=300, ge=1, le=900)
+
+    # Explicit selection avoids silently falling back to ephemeral files in production.
+    file_storage_backend: Literal["local", "r2"] = "local"
+    r2_endpoint_url: str | None = None
+    r2_bucket_name: str | None = None
+    r2_access_key_id: SecretStr | None = None
+    r2_secret_access_key: SecretStr | None = None
+    r2_prefix: str = Field(
+        default="agent-platform", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9/_-]{0,127}$"
+    )
+    sandbox_memory_mb: int = Field(default=2048, ge=256, le=8192)
+    sandbox_cpus: float = Field(default=2, gt=0, le=8)
 
     dataset_storage_root: str = "./var/datasets"
     dataset_file_limit_bytes: int = Field(default=64 * 1024 * 1024, ge=1)
@@ -193,4 +207,31 @@ class Settings(BaseSettings):
             if self.registration_invitation_code is None:
                 raise ValueError("Production requires a registration invitation code")
 
+        if self.file_storage_backend == "r2":
+            if not all(
+                (
+                    self.r2_endpoint_url,
+                    self.r2_bucket_name,
+                    self.r2_access_key_id,
+                    self.r2_secret_access_key,
+                )
+            ):
+                raise ValueError(
+                    "R2 storage requires endpoint, bucket and access credentials"
+                )
+            endpoint = urlsplit(self.r2_endpoint_url)
+            if (
+                endpoint.scheme != "https"
+                or not endpoint.hostname
+                or endpoint.username
+                or endpoint.password
+                or endpoint.query
+                or endpoint.fragment
+                or endpoint.path not in ("", "/")
+            ):
+                raise ValueError(
+                    "R2 endpoint must be an HTTPS origin without credentials"
+                )
+            if ".." in self.r2_prefix.split("/"):
+                raise ValueError("Invalid R2 prefix")
         return self

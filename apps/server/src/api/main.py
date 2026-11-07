@@ -7,12 +7,14 @@ from core.settings import Settings
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from modules.benchmarks.controllers.benchmark_controller import (
-    router as benchmarks_router,
-)
+from integrations.object_storage import StorageUnavailable
 from modules.agents.controllers.agent_controller import router as agents_router
 from modules.agents.models.error_model import AgentError
 from modules.auth.controllers.auth_controller import router as auth_router
+from modules.benchmarks.controllers.benchmark_controller import (
+    router as benchmarks_router,
+)
+from modules.datasets.controllers.dataset_controller import router as datasets_router
 from modules.evaluations.controllers.evaluation_controller import (
     router as evaluations_router,
 )
@@ -28,8 +30,6 @@ from modules.tools.controllers.tool_controller import router as tools_router
 from psycopg import Error as DatabaseError
 from psycopg_pool import PoolClosed, PoolTimeout, TooManyRequests
 from pydantic import BaseModel
-
-from modules.datasets.controllers.dataset_controller import router as datasets_router
 
 from api.bootstrap import configure_dependencies
 
@@ -57,6 +57,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     instance = FastAPI(
         title="Agent Tool Experiment Platform", version="0.1.0", lifespan=lifespan
     )
+
+    @instance.exception_handler(StorageUnavailable)
+    async def storage_unavailable(request: Request, error: StorageUnavailable):
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "File storage unavailable. Please retry."},
+        )
 
     instance.include_router(auth_router, prefix="/api/v1")
     instance.include_router(project_router, prefix="/api/v1")
