@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 
 class DatasetStorage:
-    def __init__(self, root, file_limit=64 * 1024 * 1024, remote=None):
+    def __init__(self, root, file_limit=128 * 1024 * 1024, remote=None):
         self.root = Path(root).resolve()
         self.file_limit = file_limit
         self.remote = remote

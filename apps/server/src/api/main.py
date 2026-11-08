@@ -30,6 +30,7 @@ from modules.tools.controllers.tool_controller import router as tools_router
 from psycopg import Error as DatabaseError
 from psycopg_pool import PoolClosed, PoolTimeout, TooManyRequests
 from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
 
 from api.bootstrap import configure_dependencies
 
@@ -56,6 +57,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     instance = FastAPI(
         title="Agent Tool Experiment Platform", version="0.1.0", lifespan=lifespan
+    )
+
+    config = settings if settings is not None else Settings()
+    instance.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.auth_origins,
+        allow_methods=["POST"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     @instance.exception_handler(StorageUnavailable)

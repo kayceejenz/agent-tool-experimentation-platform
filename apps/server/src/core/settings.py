@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     sandbox_cpus: float = Field(default=2, gt=0, le=8)
 
     dataset_storage_root: str = "./var/datasets"
-    dataset_file_limit_bytes: int = Field(default=64 * 1024 * 1024, ge=1)
+    dataset_file_limit_bytes: int = Field(default=128 * 1024 * 1024, ge=1)
     dataset_total_limit_bytes: int = Field(default=128 * 1024 * 1024, ge=1)
 
     api_host: str = "127.0.0.1"

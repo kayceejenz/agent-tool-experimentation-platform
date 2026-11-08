@@ -58,6 +58,12 @@ export function isCancelled(error: unknown): boolean {
 }
 
 export async function readJsonResponse(response: Response): Promise<unknown> {
+	if (response.status === 413)
+		throw new HttpResponseError(
+			413,
+			'The upload exceeds the hosting service’s request size limit. Try a smaller file or upload fewer files at once.',
+			'payload_too_large',
+		);
 	if (
 		!response.headers
 			.get('content-type')

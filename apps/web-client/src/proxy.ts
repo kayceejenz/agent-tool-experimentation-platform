@@ -10,6 +10,7 @@ export function proxy(request: NextRequest) {
 		nonce,
 		process.env.NODE_ENV !== 'production',
 		process.env.APP_ORIGIN?.startsWith('https://') ?? false,
+		process.env.SERVER_API_URL ?? 'http://127.0.0.1:8001',
 	);
 	let response: NextResponse;
 	if (

@@ -40,8 +40,12 @@ async def list_datasets(
 
 @router.post("", status_code=201)
 async def upload(project_id: UUID, request: Request, user: User, config: Config):
+    return await store_upload(project_id, request, user.id, config)
+
+
+async def store_upload(project_id, request, user_id, config):
     repo, storage = resources(request, config)
-    await repo.authorize(user.id, project_id, True)
+    await repo.authorize(user_id, project_id, True)
     # Bound the entire multipart stream, including file spool and form overhead.
     limit = config.dataset_total_limit_bytes + 1024 * 1024
     received = 0
@@ -82,9 +86,9 @@ async def upload(project_id: UUID, request: Request, user: User, config: Config)
                     raise HTTPException(413, "Dataset exceeds the total upload limit")
                 await asyncio.to_thread(storage.preview, dataset_id, file_id)
                 files.append({"id": file_id, "name": filename, **metadata})
-            await repo.create(user.id, project_id, dataset_id, name.strip(), files)
+            await repo.create(user_id, project_id, dataset_id, name.strip(), files)
             committed = True
-        return await repo.get(user.id, project_id, dataset_id)
+        return await repo.get(user_id, project_id, dataset_id)
     except StarletteHTTPException:
         if received > limit:
             raise HTTPException(413, "Dataset exceeds the total upload limit") from None
@@ -92,6 +96,42 @@ async def upload(project_id: UUID, request: Request, user: User, config: Config)
     finally:
         if not committed:
             await asyncio.to_thread(storage.remove, dataset_id)
+
+
+@router.post("/upload-ticket")
+async def upload_ticket(project_id: UUID, request: Request, user: User, config: Config):
+    origin = request.headers.get("origin")
+    if origin not in config.auth_origins:
+        raise HTTPException(403, "Untrusted upload origin")
+    repo, _ = resources(request, config)
+    await repo.authorize(user.id, project_id, True)
+    token = await repo.issue_upload_ticket(user, project_id, origin)
+    return {
+        "token": token,
+        "expires_in": 300,
+        "file_limit_bytes": config.dataset_file_limit_bytes,
+        "total_limit_bytes": config.dataset_total_limit_bytes,
+    }
+
+
+@router.post("/direct-upload", status_code=201)
+async def direct_upload(project_id: UUID, request: Request, config: Config):
+    origin = request.headers.get("origin")
+    authorization = request.headers.get("authorization", "")
+    if origin not in config.auth_origins or not authorization.startswith("Upload "):
+        raise HTTPException(403, "Invalid upload authorization")
+    token = authorization.removeprefix("Upload ")
+    if not 32 <= len(token) <= 128:
+        raise HTTPException(403, "Invalid upload authorization")
+    if not request.headers.get("content-type", "").startswith("multipart/form-data;"):
+        raise HTTPException(415, "Send a CSV dataset upload")
+    repo, _ = resources(request, config)
+    user_id = await repo.consume_upload_ticket(project_id, origin, token)
+    if user_id is None:
+        raise HTTPException(
+            403, "Upload authorization expired or already used. Retry the upload."
+        )
+    return await store_upload(project_id, request, user_id, config)
 
 
 @router.get("/{dataset_id}")

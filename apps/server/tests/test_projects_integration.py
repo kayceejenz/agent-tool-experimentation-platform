@@ -314,3 +314,49 @@ def test_usage_aggregates_project_records_without_double_counting(workspace):
     assert value["sources"]["evaluation"]["total_tokens"] == 2200
     assert sum(day["total_tokens"] for day in value["daily"]) == 5500
     assert result.headers["cache-control"] == "no-store"
+
+
+def test_project_navigation_settings_persist_and_are_scoped(workspace):
+    client, config, users = workspace
+    owner, editor, viewer, outsider = users
+    project = create(client, owner[1])
+    other = create(client, owner[1], "Other")
+    path = f"/api/v1/projects/{project['id']}"
+    for user, role in [(editor, "editor"), (viewer, "viewer")]:
+        query(
+            config,
+            "INSERT INTO agent_platform.project_members(project_id,user_id,role) VALUES (%s,%s,%s)",
+            (project["id"], user[0], role),
+        )
+    assert project["hidden_sections"] == []
+    changes = {"hidden_sections": ["servers", "tools", "benchmarks"]}
+    assert client.patch(path, headers=viewer[1], json=changes).status_code == 403
+    assert client.patch(path, headers=outsider[1], json=changes).status_code == 404
+    response = client.patch(path, headers=editor[1], json=changes)
+    assert response.status_code == 200, response.text
+    assert (
+        client.get(path, headers=viewer[1]).json()["hidden_sections"]
+        == changes["hidden_sections"]
+    )
+    assert (
+        client.get(f"/api/v1/projects/{other['id']}", headers=owner[1]).json()[
+            "hidden_sections"
+        ]
+        == []
+    )
+    assert (
+        client.patch(
+            path, headers=owner[1], json={"hidden_sections": ["settings"]}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.patch(path, headers=owner[1], json={"hidden_sections": None}).status_code
+        == 422
+    )
+    assert (
+        client.patch(path, headers=owner[1], json={"hidden_sections": []}).json()[
+            "hidden_sections"
+        ]
+        == []
+    )

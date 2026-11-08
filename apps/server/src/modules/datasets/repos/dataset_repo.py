@@ -1,3 +1,6 @@
+import hashlib
+import secrets
+
 from fastapi import HTTPException
 from psycopg.rows import dict_row
 
@@ -115,3 +118,32 @@ class DatasetRepository:
                 await db.execute(
                     "DELETE FROM agent_platform.datasets WHERE id=%s", (dataset_id,)
                 )
+
+    async def issue_upload_ticket(self, user, project_id, origin):
+        token = secrets.token_urlsafe(32)
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        async with self.database.connection() as conn:
+            async with conn.cursor() as db:
+                await db.execute(
+                    "DELETE FROM agent_platform.dataset_upload_tickets WHERE expires_at < now()"
+                )
+                await db.execute(
+                    "INSERT INTO agent_platform.dataset_upload_tickets(token_hash,project_id,user_id,token_version,origin) VALUES (%s,%s,%s,%s,%s)",
+                    (digest, project_id, user.id, user.token_version, origin),
+                )
+        return token
+
+    async def consume_upload_ticket(self, project_id, origin, token):
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        async with self.database.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as db:
+                row = await (
+                    await db.execute(
+                        """DELETE FROM agent_platform.dataset_upload_tickets t USING agent_platform.users u
+                    WHERE t.token_hash=%s AND t.project_id=%s AND t.origin=%s AND t.expires_at>now()
+                      AND u.id=t.user_id AND u.is_active AND u.deleted_at IS NULL AND u.token_version=t.token_version
+                    RETURNING t.user_id""",
+                        (digest, project_id, origin),
+                    )
+                ).fetchone()
+        return row["user_id"] if row else None

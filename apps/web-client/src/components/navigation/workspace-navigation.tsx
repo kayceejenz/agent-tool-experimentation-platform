@@ -113,8 +113,20 @@ export function WorkspaceNavigation({
 							aria-label='Switch project'
 							value={project.id}
 							onChange={event => {
+								const target =
+									choices.find(
+										item =>
+											item.id ===
+											event
+												.target
+												.value,
+									);
 								const section =
-									pathParts[3];
+									target?.hidden_sections?.includes(
+										pathParts[3],
+									)
+										? undefined
+										: pathParts[3];
 								router.push(
 									`/projects/${event.target.value}${section ? `/${section}` : ''}`,
 								);
@@ -154,15 +166,22 @@ export function WorkspaceNavigation({
 				</Link>
 			)}
 			<div className='nav-group'>
-				{projectSections.map(item =>
-					navLink(
-						base
-							? `${base}/${item.slug}`
-							: undefined,
-						item.label,
-						item.icon,
-					),
-				)}
+				{projectSections
+					.filter(
+						item =>
+							!project?.hidden_sections?.includes(
+								item.slug,
+							),
+					)
+					.map(item =>
+						navLink(
+							base
+								? `${base}/${item.slug}`
+								: undefined,
+							item.label,
+							item.icon,
+						),
+					)}
 			</div>
 			<div className='nav-group nav-settings'>
 				{navLink(

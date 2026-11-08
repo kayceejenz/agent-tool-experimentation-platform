@@ -23,6 +23,8 @@ x-runtime: &runtime
     AGENT_API_HOST: 0.0.0.0
     AGENT_API_PORT: '8001'
     AGENT_DATASET_STORAGE_ROOT: /tmp/agent-datasets
+    AGENT_DATASET_FILE_LIMIT_BYTES: ${AGENT_DATASET_FILE_LIMIT_BYTES:-134217728}
+    AGENT_DATASET_TOTAL_LIMIT_BYTES: ${AGENT_DATASET_TOTAL_LIMIT_BYTES:-134217728}
     AGENT_SANDBOX_STORAGE_ROOT: ${AGENT_WORKSPACE_ROOT:-/srv/agent-platform/sandboxes}
     AGENT_SANDBOX_MEMORY_MB: ${AGENT_SANDBOX_MEMORY_MB:-512}
     AGENT_SANDBOX_CPUS: ${AGENT_SANDBOX_CPUS:-0.5}
@@ -33,7 +35,10 @@ services:
     command: agent-platform-api
     ports:
       - '127.0.0.1:${AGENT_API_HOST_PORT:-8001}:8001'
-    mem_limit: 192m
+    # Multipart parsing and validated storage can temporarily spool two file copies.
+    tmpfs:
+      - /tmp:size=384m,mode=1777
+    mem_limit: 512m
     cpus: 0.5
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health',timeout=3).read()"]

@@ -6,6 +6,7 @@ import type { Project } from '@/types/workspace';
 import { ProjectRequestError } from '@/lib/projects/client';
 import { useProjects } from './project-provider';
 import { projectWrite } from '@/lib/projects/client';
+import { projectNavigation } from '@/lib/projects/navigation';
 
 export function ProjectForm({ project }: { project?: Project }) {
 	const router = useRouter();
@@ -13,6 +14,9 @@ export function ProjectForm({ project }: { project?: Project }) {
 	const [name, setName] = useState(project?.name ?? '');
 	const [description, setDescription] = useState(
 		project?.description ?? '',
+	);
+	const [hiddenSections, setHiddenSections] = useState(
+		project?.hidden_sections ?? [],
 	);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState('');
@@ -22,8 +26,8 @@ export function ProjectForm({ project }: { project?: Project }) {
 
 	async function submit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		if(busy || readOnly) return;
-		if(!name.trim()) {
+		if (busy || readOnly) return;
+		if (!name.trim()) {
 			setError('Enter a project name.');
 			return;
 		}
@@ -31,29 +35,38 @@ export function ProjectForm({ project }: { project?: Project }) {
 		setError('');
 		setSaved(false);
 		try {
-			const result = await projectWrite<Project>(project ? `/${project.id}` : '', project ? 'PATCH' : 'POST', {
-				name: name.trim(),
-				description:
-					description.trim() ||
-					null,
-			});
+			const result = await projectWrite<Project>(
+				project ? `/${project.id}` : '',
+				project ? 'PATCH' : 'POST',
+				{
+					name: name.trim(),
+					...(project
+						? {
+								hidden_sections:
+									hiddenSections,
+							}
+						: {}),
+					description: description.trim() || null,
+				},
+			);
 			upsert(result);
 			setName(result.name);
+			setHiddenSections(result.hidden_sections ?? []);
 			setDescription(result.description ?? '');
-			if(project) {
+			if (project) {
 				setSaved(true);
 				router.refresh();
 			} else {
 				router.push(`/projects/${result.id}`);
 				router.refresh();
 			}
-		} catch(error) {
+		} catch (error) {
 			setError(
 				error instanceof Error
 					? error.message
 					: 'Unable to save this project.',
 			);
-			if(
+			if (
 				error instanceof ProjectRequestError &&
 				(error.status === 403 || error.status === 404)
 			)
@@ -116,6 +129,54 @@ export function ProjectForm({ project }: { project?: Project }) {
 				Describe what this project is for. Up to 2,000
 				characters.
 			</small>
+			{project && (
+				<fieldset
+					className='project-navigation-settings'
+					disabled={busy || readOnly}>
+					<legend>
+						Visible navigation links
+					</legend>
+					<p>
+						Choose the sections shown for
+						everyone in this project. Hidden
+						sections remain accessible by
+						URL.
+					</p>
+					{projectNavigation.map(item => (
+						<label key={item.slug}>
+							<input
+								type='checkbox'
+								checked={
+									!hiddenSections.includes(
+										item.slug,
+									)
+								}
+								onChange={event => {
+									setHiddenSections(
+										current =>
+											event
+												.target
+												.checked
+												? current.filter(
+														slug =>
+															slug !==
+															item.slug,
+													)
+												: [
+														...current,
+														item.slug,
+													],
+									);
+									setSaved(
+										false,
+									);
+								}}
+							/>
+							{item.label}
+						</label>
+					))}
+				</fieldset>
+			)}
 			<div className='project-form-actions'>
 				{!readOnly && (
 					<button

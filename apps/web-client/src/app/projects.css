@@ -64,3 +64,25 @@
 		padding: var(--space-8);
 	}
 }
+.project-navigation-settings {
+	display: grid;
+	gap: var(--space-6);
+	border: 1px solid var(--control-line);
+	border-radius: 8px;
+	padding: var(--space-8);
+}
+.project-navigation-settings p {
+	color: var(--muted);
+	font-size: 14px;
+}
+.project-navigation-settings label {
+	display: flex;
+	align-items: center;
+	gap: var(--space-5);
+}
+.project-navigation-settings input[type='checkbox'] {
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	accent-color: var(--foreground);
+}

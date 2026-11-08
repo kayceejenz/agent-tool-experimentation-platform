@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
@@ -14,3 +14,4 @@ class Project:
     created_at: datetime
     updated_at: datetime
     role: ProjectRole
+    hidden_sections: list[str] = field(default_factory=list)

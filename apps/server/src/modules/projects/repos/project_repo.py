@@ -78,7 +78,11 @@ class ProjectRepository:
                     raise ProjectNotFoundError
                 if member["role"] not in ("owner", "editor"):
                     raise ProjectForbiddenError
-                fields = [key for key in ("name", "description") if key in changes]
+                fields = [
+                    key
+                    for key in ("name", "description", "hidden_sections")
+                    if key in changes
+                ]
                 statement = sql.SQL(
                     "UPDATE agent_platform.projects SET {} WHERE id=%s RETURNING *"
                 ).format(

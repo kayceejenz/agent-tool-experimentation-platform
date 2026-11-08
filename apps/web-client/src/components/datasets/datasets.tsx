@@ -41,20 +41,29 @@ function message(error: unknown) {
 		? error.message
 		: 'Request failed. Please try again.';
 }
-async function read<T>(url: string, init?: RequestInit): Promise<T> {
+async function read<T>(
+	url: string,
+	init?: RequestInit,
+	timeoutMs = 120_000,
+): Promise<T> {
 	const response = await fetch(url, {
 		...init,
 		cache: 'no-store',
-		signal: AbortSignal.timeout(120_000),
+		signal: AbortSignal.timeout(timeoutMs),
 	});
 	const value = await readJsonResponse(response);
 	if (!response.ok)
 		throw new Error(
 			response.status === 401
 				? 'Your session expired. Sign in again.'
-				: isRecord(value) && typeof value.error === 'string'
+				: isRecord(value) &&
+					  typeof value.error === 'string'
 					? value.error
-					: 'Dataset request failed. Please try again.',
+					: isRecord(value) &&
+						  typeof value.detail ===
+								'string'
+						? value.detail
+						: 'Dataset request failed. Please try again.',
 		);
 	return value as T;
 }
@@ -95,7 +104,10 @@ function Popup({
 			}}>
 			<header className={styles.modalHeader}>
 				<h2 id={titleId}>{title}</h2>
-				<button className='button' disabled={busy} onClick={onClose}>
+				<button
+					className='button'
+					disabled={busy}
+					onClick={onClose}>
 					Close
 				</button>
 			</header>
@@ -146,7 +158,8 @@ export function Datasets({ project }: { project: Project }) {
 		let active = true;
 		read<{ items: Dataset[] }>(base)
 			.then(page => {
-				if (!active || request !== listRequest.current) return;
+				if (!active || request !== listRequest.current)
+					return;
 				setItems(page.items);
 				setMore(page.items.length === 50);
 			})
@@ -155,7 +168,8 @@ export function Datasets({ project }: { project: Project }) {
 					setListError(message(error));
 			})
 			.finally(() => {
-				if (active && request === listRequest.current) setLoading(false);
+				if (active && request === listRequest.current)
+					setLoading(false);
 			});
 		return () => {
 			active = false;
@@ -167,7 +181,9 @@ export function Datasets({ project }: { project: Project }) {
 		const initialRequest = detailRequest.current;
 		let saved: { dataset?: string; file?: string };
 		try {
-			saved = JSON.parse(sessionStorage.getItem(base) ?? '{}');
+			saved = JSON.parse(
+				sessionStorage.getItem(base) ?? '{}',
+			);
 		} catch {
 			return;
 		}
@@ -180,10 +196,16 @@ export function Datasets({ project }: { project: Project }) {
 		const datasetId = saved.dataset;
 		read<Detail>(`${base}/${datasetId}`)
 			.then(async result => {
-				if (!active || detailRequest.current !== initialRequest) return;
+				if (
+					!active ||
+					detailRequest.current !== initialRequest
+				)
+					return;
 				setSelectedId(result.id);
 				setDetail(result);
-				const selected = result.files.find(item => item.id === saved.file);
+				const selected = result.files.find(
+					item => item.id === saved.file,
+				);
 				if (!selected) return;
 				const request = ++previewRequest.current;
 				setFile(selected);
@@ -192,12 +214,25 @@ export function Datasets({ project }: { project: Project }) {
 					const records = await read<Preview>(
 						`${base}/${datasetId}/files/${selected.id}/preview`,
 					);
-					if (active && request === previewRequest.current) setPreview(records);
+					if (
+						active &&
+						request ===
+							previewRequest.current
+					)
+						setPreview(records);
 				} catch (error) {
-					if (active && request === previewRequest.current)
+					if (
+						active &&
+						request ===
+							previewRequest.current
+					)
 						setPreviewError(message(error));
 				} finally {
-					if (active && request === previewRequest.current)
+					if (
+						active &&
+						request ===
+							previewRequest.current
+					)
 						setPreviewLoading(false);
 				}
 			})
@@ -225,11 +260,14 @@ export function Datasets({ project }: { project: Project }) {
 			const result = await read<Preview>(
 				`${base}/${datasetId}/files/${selected.id}/preview`,
 			);
-			if (request === previewRequest.current) setPreview(result);
+			if (request === previewRequest.current)
+				setPreview(result);
 		} catch (error) {
-			if (request === previewRequest.current) setPreviewError(message(error));
+			if (request === previewRequest.current)
+				setPreviewError(message(error));
 		} finally {
-			if (request === previewRequest.current) setPreviewLoading(false);
+			if (request === previewRequest.current)
+				setPreviewLoading(false);
 		}
 	}
 	function show(result: Detail) {
@@ -270,9 +308,11 @@ export function Datasets({ project }: { project: Project }) {
 			const result = await read<Detail>(`${base}/${id}`);
 			if (request === detailRequest.current) show(result);
 		} catch (error) {
-			if (request === detailRequest.current) setDetailError(message(error));
+			if (request === detailRequest.current)
+				setDetailError(message(error));
 		} finally {
-			if (request === detailRequest.current) setDetailLoading(false);
+			if (request === detailRequest.current)
+				setDetailLoading(false);
 		}
 	}
 	async function upload(event: React.FormEvent<HTMLFormElement>) {
@@ -285,13 +325,18 @@ export function Datasets({ project }: { project: Project }) {
 			!pending.length ||
 			pending.length > 20 ||
 			pending.some(
-				f => !/\.csv$/i.test(f.name) || !f.size || f.size > 64 * 1024 * 1024,
+				f =>
+					!/\.csv$/i.test(f.name) ||
+					!f.size ||
+					f.size > 128 * 1024 * 1024,
 			) ||
-			pending.reduce((sum, f) => sum + f.size, 0) > 128 * 1024 * 1024 ||
-			new Set(pending.map(f => f.name)).size !== pending.length
+			pending.reduce((sum, f) => sum + f.size, 0) >
+				128 * 1024 * 1024 ||
+			new Set(pending.map(f => f.name)).size !==
+				pending.length
 		) {
 			setUploadError(
-				'Enter a name and select 1–20 unique, nonempty CSV files. Maximum 64 MiB per file and 128 MiB total.',
+				'Enter a name and select 1–20 unique, nonempty CSV files. Maximum 128 MiB per file and 128 MiB total.',
 			);
 			return;
 		}
@@ -302,10 +347,39 @@ export function Datasets({ project }: { project: Project }) {
 		setUploadError('');
 		setNotice('');
 		try {
-			const result = await read<Detail>(base, {
-				method: 'POST',
-				body,
-			});
+			const ticket = await read<{
+				token: string;
+				upload_url: string;
+				file_limit_bytes: number;
+				total_limit_bytes: number;
+			}>(`${base}/upload-ticket`, { method: 'POST' });
+			if (
+				pending.some(
+					file =>
+						file.size >
+						ticket.file_limit_bytes,
+				) ||
+				pending.reduce(
+					(total, file) => total + file.size,
+					0,
+				) > ticket.total_limit_bytes
+			)
+				throw new Error(
+					`The server allows ${size(ticket.file_limit_bytes)} per file and ${size(ticket.total_limit_bytes)} total.`,
+				);
+			const result = await read<Detail>(
+				ticket.upload_url,
+				{
+					method: 'POST',
+					headers: {
+						Authorization: `Upload ${ticket.token}`,
+					},
+					credentials: 'omit',
+					redirect: 'error',
+					body,
+				},
+				600_000,
+			);
 			detailRequest.current++;
 			listRequest.current++;
 			setDetailLoading(false);
@@ -314,7 +388,9 @@ export function Datasets({ project }: { project: Project }) {
 			show(result);
 			setItems(current => [
 				result,
-				...current.filter(item => item.id !== result.id),
+				...current.filter(
+					item => item.id !== result.id,
+				),
 			]);
 			setLoading(false);
 			setListError('');
@@ -337,10 +413,15 @@ export function Datasets({ project }: { project: Project }) {
 		setBusy(true);
 		setDeleteError('');
 		try {
-			await read(`${base}/${deleting.id}`, { method: 'DELETE' });
+			await read(`${base}/${deleting.id}`, {
+				method: 'DELETE',
+			});
 			listRequest.current++;
-			if (selectedId === deleting.id) toggleDataset(deleting.id);
-			setItems(current => current.filter(item => item.id !== deleting.id));
+			if (selectedId === deleting.id)
+				toggleDataset(deleting.id);
+			setItems(current =>
+				current.filter(item => item.id !== deleting.id),
+			);
 			setDeleting(null);
 			setNotice(`“${deleting.name}” deleted.`);
 			uploadButton.current?.focus();
@@ -364,11 +445,19 @@ export function Datasets({ project }: { project: Project }) {
 			if (request !== listRequest.current) return;
 			setItems(current => [
 				...current,
-				...page.items.filter(item => !current.some(old => old.id === item.id)),
+				...page.items.filter(
+					item =>
+						!current.some(
+							old =>
+								old.id ===
+								item.id,
+						),
+				),
 			]);
 			setMore(page.items.length === 50);
 		} catch (error) {
-			if (request === listRequest.current) setListError(message(error));
+			if (request === listRequest.current)
+				setListError(message(error));
 		} finally {
 			setMoreLoading(false);
 		}
@@ -386,10 +475,13 @@ export function Datasets({ project }: { project: Project }) {
 						aria-expanded={uploadOpen}
 						aria-controls='dataset-upload'
 						onClick={() => {
-							setUploadOpen(open => !open);
+							setUploadOpen(
+								open => !open,
+							);
 						}}
 						disabled={busy}>
-						<Upload size={16} /> Upload dataset
+						<Upload size={16} /> Upload
+						dataset
 					</button>
 				)}
 			</PageHeader>
@@ -406,15 +498,23 @@ export function Datasets({ project }: { project: Project }) {
 					onClose={() => setDeleting(null)}>
 					<section className={styles.upload}>
 						<p>
-							Delete “{deleting.name}” and all its uploaded files? This cannot
-							be undone.
+							Delete “{deleting.name}”
+							and all its uploaded
+							files? This cannot be
+							undone.
 						</p>
 						<p>
-							Completed analysis results will remain available. New analyses
+							Completed analysis
+							results will remain
+							available. New analyses
 							will need a new upload.
 						</p>
 						{deleteError && (
-							<p role='alert' className={styles.error}>
+							<p
+								role='alert'
+								className={
+									styles.error
+								}>
 								{deleteError}
 							</p>
 						)}
@@ -422,13 +522,21 @@ export function Datasets({ project }: { project: Project }) {
 							<button
 								className={`button ${styles.deleteButton}`}
 								disabled={busy}
-								onClick={() => void deleteDataset()}>
-								{busy ? 'Deleting…' : 'Delete dataset'}
+								onClick={() =>
+									void deleteDataset()
+								}>
+								{busy
+									? 'Deleting…'
+									: 'Delete dataset'}
 							</button>
 							<button
 								className='button'
 								disabled={busy}
-								onClick={() => setDeleting(null)}>
+								onClick={() =>
+									setDeleting(
+										null,
+									)
+								}>
 								Cancel
 							</button>
 						</div>
@@ -445,82 +553,181 @@ export function Datasets({ project }: { project: Project }) {
 						className={`panel ${styles.upload}`}
 						id='dataset-upload'
 						aria-labelledby='upload-title'>
-						<h2 id='upload-title'>New dataset</h2>
-						<p>Give related files a name, then upload them together.</p>
-						<form onSubmit={upload} aria-busy={busy}>
+						<h2 id='upload-title'>
+							New dataset
+						</h2>
+						<p>
+							Give related files a
+							name, then upload them
+							together.
+						</p>
+						<form
+							onSubmit={upload}
+							aria-busy={busy}>
 							<label>
 								Dataset name
 								<input
 									name='name'
 									required
-									maxLength={160}
-									placeholder='e.g. Pig behaviour trial — March 2025'
-									disabled={busy}
+									maxLength={
+										160
+									}
+									placeholder='Enter a dataset name'
+									disabled={
+										busy
+									}
 								/>
 							</label>
-							<label className={styles.picker}>
-								<Upload size={24} />
-								<span>Choose CSV files</span>
+							<label
+								className={
+									styles.picker
+								}>
+								<Upload
+									size={
+										24
+									}
+								/>
+								<span>
+									Choose
+									CSV
+									files
+								</span>
 								<small>
-									UTF-8 · Up to 20 files · 64 MiB each · 128 MiB total
+									UTF-8 ·
+									Up to 20
+									files ·
+									128 MiB
+									each ·
+									128 MiB
+									total
 								</small>
 								<input
 									name='files'
 									type='file'
 									accept='.csv'
 									multiple
-									disabled={busy}
+									disabled={
+										busy
+									}
 									onChange={event => {
-										setPending(Array.from(event.target.files ?? []));
-										setUploadError('');
+										setPending(
+											Array.from(
+												event
+													.target
+													.files ??
+													[],
+											),
+										);
+										setUploadError(
+											'',
+										);
 									}}
 								/>
 							</label>
 							{pending.length > 0 && (
-								<div className={styles.pending}>
+								<div
+									className={
+										styles.pending
+									}>
 									<strong>
-										{pending.length} selected ·{' '}
-										{size(pending.reduce((sum, f) => sum + f.size, 0))}
+										{
+											pending.length
+										}{' '}
+										selected
+										·{' '}
+										{size(
+											pending.reduce(
+												(
+													sum,
+													f,
+												) =>
+													sum +
+													f.size,
+												0,
+											),
+										)}
 									</strong>
 									<ul>
-										{pending.map((f, index) => (
-											<li key={`${f.name}-${index}`}>
-												<span>{f.name}</span>
-												<small>{size(f.size)}</small>
-												<button
-													type='button'
-													className='button'
-													disabled={busy}
-													aria-label={`Remove ${f.name}`}
-													onClick={() =>
-														setPending(current =>
-															current.filter((_, i) => i !== index),
-														)
-													}>
-													Remove
-												</button>
-											</li>
-										))}
+										{pending.map(
+											(
+												f,
+												index,
+											) => (
+												<li
+													key={`${f.name}-${index}`}>
+													<span>
+														{
+															f.name
+														}
+													</span>
+													<small>
+														{size(
+															f.size,
+														)}
+													</small>
+													<button
+														type='button'
+														className='button'
+														disabled={
+															busy
+														}
+														aria-label={`Remove ${f.name}`}
+														onClick={() =>
+															setPending(
+																current =>
+																	current.filter(
+																		(
+																			_,
+																			i,
+																		) =>
+																			i !==
+																			index,
+																	),
+															)
+														}>
+														Remove
+													</button>
+												</li>
+											),
+										)}
 									</ul>
 								</div>
 							)}
 							{uploadError && (
-								<p role='alert' className={styles.error}>
-									{uploadError}
+								<p
+									role='alert'
+									className={
+										styles.error
+									}>
+									{
+										uploadError
+									}
 								</p>
 							)}
-							<div className={styles.actions}>
+							<div
+								className={
+									styles.actions
+								}>
 								<button
 									className='button primary'
-									disabled={busy || !pending.length}>
-									{busy ? 'Uploading files…' : 'Save dataset'}
+									disabled={
+										busy ||
+										!pending.length
+									}>
+									{busy
+										? 'Uploading files…'
+										: 'Save dataset'}
 								</button>
 								<button
 									type='button'
 									className='button'
-									disabled={busy}
+									disabled={
+										busy
+									}
 									onClick={() => {
-										setUploadOpen(false);
+										setUploadOpen(
+											false,
+										);
 										uploadButton.current?.focus();
 									}}>
 									Cancel
@@ -543,21 +750,31 @@ export function Datasets({ project }: { project: Project }) {
 					<button
 						className='button'
 						aria-label='Refresh datasets'
-						disabled={loading || moreLoading || busy}
+						disabled={
+							loading ||
+							moreLoading ||
+							busy
+						}
 						onClick={refresh}>
 						<RefreshCw size={16} />
 					</button>
 				</div>
 				{listError && (
-					<div className={styles.error} role='alert'>
+					<div
+						className={styles.error}
+						role='alert'>
 						{listError}{' '}
-						<button className='button' onClick={refresh}>
+						<button
+							className='button'
+							onClick={refresh}>
 							Retry
 						</button>
 					</div>
 				)}
 				{loading ? (
-					<p className={styles.empty} role='status'>
+					<p
+						className={styles.empty}
+						role='status'>
 						Loading datasets…
 					</p>
 				) : !items.length && !listError ? (
@@ -572,8 +789,17 @@ export function Datasets({ project }: { project: Project }) {
 						{canEdit && (
 							<button
 								className='button primary'
-								onClick={() => setUploadOpen(true)}>
-								<Upload size={16} /> Add dataset
+								onClick={() =>
+									setUploadOpen(
+										true,
+									)
+								}>
+								<Upload
+									size={
+										16
+									}
+								/>{' '}
+								Add dataset
 							</button>
 						)}
 					</div>
@@ -586,129 +812,247 @@ export function Datasets({ project }: { project: Project }) {
 						<table>
 							<thead>
 								<tr>
-									<th scope='col'>Dataset / file</th>
-									<th scope='col'>Type</th>
-									<th scope='col'>Size</th>
-									<th scope='col'>Added</th>
-									<th scope='col'>Actions</th>
+									<th scope='col'>
+										Dataset
+										/
+										file
+									</th>
+									<th scope='col'>
+										Type
+									</th>
+									<th scope='col'>
+										Size
+									</th>
+									<th scope='col'>
+										Added
+									</th>
+									<th scope='col'>
+										Actions
+									</th>
 								</tr>
 							</thead>
 							<tbody>
-								{items.map(item => (
-									<Fragment key={item.id}>
-										<tr
-											className={
-												selectedId === item.id ? styles.activeRow : undefined
+								{items.map(
+									item => (
+										<Fragment
+											key={
+												item.id
 											}>
-											<th scope='row'>
-												<button
-													className={styles.datasetName}
-													disabled={busy}
-													aria-expanded={selectedId === item.id}
-													onClick={() => toggleDataset(item.id)}>
-													<ChevronRight
-														size={16}
-														className={
-															selectedId === item.id
-																? styles.expanded
-																: styles.collapsed
-														}
-													/>
-													<Database size={18} />
-													{item.name}
-												</button>
-											</th>
-											<td>Dataset</td>
-											<td>
-												{detail?.id === item.id
-													? size(
-															detail.files.reduce(
-																(sum, f) => sum + f.size_bytes,
-																0,
-															),
-														)
-													: '—'}
-											</td>
-											<td>
-												<time dateTime={item.created_at}>
-													{new Date(item.created_at).toLocaleDateString(
-														undefined,
-														{
-															day: 'numeric',
-															month: 'short',
-															year: 'numeric',
-														},
-													)}
-												</time>
-											</td>
-											<td>
-												<button
-													className='button'
-													disabled={busy}
-													onClick={() => toggleDataset(item.id)}
-													aria-label={`${selectedId === item.id ? 'Collapse' : 'Expand'} ${item.name}`}>
-													{selectedId === item.id ? 'Collapse' : 'Expand'}
-												</button>
-												{canEdit && (
+											<tr
+												className={
+													selectedId ===
+													item.id
+														? styles.activeRow
+														: undefined
+												}>
+												<th scope='row'>
 													<button
-														className={`button ${styles.deleteButton}`}
-														disabled={busy}
-														aria-label={`Delete ${item.name}`}
-														onClick={() => {
-															setDeleteError('');
-															setDeleting(item);
-														}}>
-														Delete
+														className={
+															styles.datasetName
+														}
+														disabled={
+															busy
+														}
+														aria-expanded={
+															selectedId ===
+															item.id
+														}
+														onClick={() =>
+															toggleDataset(
+																item.id,
+															)
+														}>
+														<ChevronRight
+															size={
+																16
+															}
+															className={
+																selectedId ===
+																item.id
+																	? styles.expanded
+																	: styles.collapsed
+															}
+														/>
+														<Database
+															size={
+																18
+															}
+														/>
+														{
+															item.name
+														}
 													</button>
-												)}
-											</td>
-										</tr>
-										{selectedId === item.id &&
-											(detailLoading ? (
-												<tr>
-													<td colSpan={5} role='status'>
-														Loading files…
-													</td>
-												</tr>
-											) : detailError ? (
-												<tr>
-													<td colSpan={5}>
-														<div role='alert' className={styles.error}>
-															{detailError}{' '}
-															<button
-																className='button'
-																onClick={() => void select(item.id)}>
-																Retry
-															</button>
-														</div>
-													</td>
-												</tr>
-											) : (
-												detail?.id === item.id &&
-												detail.files.map(entry => (
-													<tr key={entry.id} className={styles.fileEntry}>
-														<th scope='row'>
-															<span className={styles.filename}>
-																<FileSpreadsheet size={18} />
-																{entry.name}
-															</span>
-														</th>
-														<td>CSV</td>
-														<td>{size(entry.size_bytes)}</td>
-														<td>—</td>
-														<td>
-															<button
-																className='button'
-																aria-label={`Preview ${entry.name}`}
-																onClick={() => void inspect(item.id, entry)}>
-																Preview
-															</button>
+												</th>
+												<td>
+													Dataset
+												</td>
+												<td>
+													{detail?.id ===
+													item.id
+														? size(
+																detail.files.reduce(
+																	(
+																		sum,
+																		f,
+																	) =>
+																		sum +
+																		f.size_bytes,
+																	0,
+																),
+															)
+														: '—'}
+												</td>
+												<td>
+													<time
+														dateTime={
+															item.created_at
+														}>
+														{new Date(
+															item.created_at,
+														).toLocaleDateString(
+															undefined,
+															{
+																day: 'numeric',
+																month: 'short',
+																year: 'numeric',
+															},
+														)}
+													</time>
+												</td>
+												<td>
+													<button
+														className='button'
+														disabled={
+															busy
+														}
+														onClick={() =>
+															toggleDataset(
+																item.id,
+															)
+														}
+														aria-label={`${selectedId === item.id ? 'Collapse' : 'Expand'} ${item.name}`}>
+														{selectedId ===
+														item.id
+															? 'Collapse'
+															: 'Expand'}
+													</button>
+													{canEdit && (
+														<button
+															className={`button ${styles.deleteButton}`}
+															disabled={
+																busy
+															}
+															aria-label={`Delete ${item.name}`}
+															onClick={() => {
+																setDeleteError(
+																	'',
+																);
+																setDeleting(
+																	item,
+																);
+															}}>
+															Delete
+														</button>
+													)}
+												</td>
+											</tr>
+											{selectedId ===
+												item.id &&
+												(detailLoading ? (
+													<tr>
+														<td
+															colSpan={
+																5
+															}
+															role='status'>
+															Loading
+															files…
 														</td>
 													</tr>
-												))
-											))}
-									</Fragment>
-								))}
+												) : detailError ? (
+													<tr>
+														<td
+															colSpan={
+																5
+															}>
+															<div
+																role='alert'
+																className={
+																	styles.error
+																}>
+																{
+																	detailError
+																}{' '}
+																<button
+																	className='button'
+																	onClick={() =>
+																		void select(
+																			item.id,
+																		)
+																	}>
+																	Retry
+																</button>
+															</div>
+														</td>
+													</tr>
+												) : (
+													detail?.id ===
+														item.id &&
+													detail.files.map(
+														entry => (
+															<tr
+																key={
+																	entry.id
+																}
+																className={
+																	styles.fileEntry
+																}>
+																<th scope='row'>
+																	<span
+																		className={
+																			styles.filename
+																		}>
+																		<FileSpreadsheet
+																			size={
+																				18
+																			}
+																		/>
+																		{
+																			entry.name
+																		}
+																	</span>
+																</th>
+																<td>
+																	CSV
+																</td>
+																<td>
+																	{size(
+																		entry.size_bytes,
+																	)}
+																</td>
+																<td>
+																	—
+																</td>
+																<td>
+																	<button
+																		className='button'
+																		aria-label={`Preview ${entry.name}`}
+																		onClick={() =>
+																			void inspect(
+																				item.id,
+																				entry,
+																			)
+																		}>
+																		Preview
+																	</button>
+																</td>
+															</tr>
+														),
+													)
+												))}
+										</Fragment>
+									),
+								)}
 							</tbody>
 						</table>
 					</div>
@@ -716,9 +1060,15 @@ export function Datasets({ project }: { project: Project }) {
 				{more && (
 					<button
 						className='button'
-						disabled={moreLoading || loading || busy}
+						disabled={
+							moreLoading ||
+							loading ||
+							busy
+						}
 						onClick={() => void loadMore()}>
-						{moreLoading ? 'Loading…' : 'Load more datasets'}
+						{moreLoading
+							? 'Loading…'
+							: 'Load more datasets'}
 					</button>
 				)}
 			</section>
@@ -738,78 +1088,160 @@ export function Datasets({ project }: { project: Project }) {
 						aria-busy={previewLoading}>
 						<div className={styles.heading}>
 							<div>
-								<h2 id='preview-title'>Preview: {file.name}</h2>
+								<h2 id='preview-title'>
+									Preview:{' '}
+									{
+										file.name
+									}
+								</h2>
 								<p>
 									{preview
 										? `${preview.rows.length} preview rows · ${preview.headers.length} columns`
 										: 'Source records'}
 								</p>
 							</div>
-							<span className='badge'>CSV</span>
+							<span className='badge'>
+								CSV
+							</span>
 						</div>
 						{previewLoading ? (
-							<p className={styles.empty} role='status'>
+							<p
+								className={
+									styles.empty
+								}
+								role='status'>
 								Loading records…
 							</p>
 						) : previewError ? (
-							<div className={styles.error} role='alert'>
+							<div
+								className={
+									styles.error
+								}
+								role='alert'>
 								{previewError}{' '}
 								<button
 									className='button'
-									onClick={() => void inspect(detail!.id, file)}>
-									Retry preview
+									onClick={() =>
+										void inspect(
+											detail!
+												.id,
+											file,
+										)
+									}>
+									Retry
+									preview
 								</button>
 							</div>
 						) : (
 							preview && (
 								<>
 									<div
-										className={styles.preview}
-										tabIndex={0}
+										className={
+											styles.preview
+										}
+										tabIndex={
+											0
+										}
 										role='region'
 										aria-label={`Scrollable records from ${file.name}`}>
 										<table>
-											<caption className={styles.visuallyHidden}>
-												First records from {file.name}
+											<caption
+												className={
+													styles.visuallyHidden
+												}>
+												First
+												records
+												from{' '}
+												{
+													file.name
+												}
 											</caption>
 											<thead>
 												<tr>
-													<th scope='col'>Row</th>
-													{preview.headers.map(h => (
-														<th key={h} scope='col'>
-															{h}
-														</th>
-													))}
+													<th scope='col'>
+														Row
+													</th>
+													{preview.headers.map(
+														h => (
+															<th
+																key={
+																	h
+																}
+																scope='col'>
+																{
+																	h
+																}
+															</th>
+														),
+													)}
 												</tr>
 											</thead>
 											<tbody>
-												{preview.rows.map((row, i) => (
-													<tr key={i}>
-														<th scope='row'>{i + 1}</th>
-														{row.map((cell, j) => (
-															<td key={j}>
-																{cell || (
-																	<span
-																		className={styles.missing}
-																		aria-label='Empty value'>
-																		—
-																	</span>
-																)}
-															</td>
-														))}
-													</tr>
-												))}
+												{preview.rows.map(
+													(
+														row,
+														i,
+													) => (
+														<tr
+															key={
+																i
+															}>
+															<th scope='row'>
+																{i +
+																	1}
+															</th>
+															{row.map(
+																(
+																	cell,
+																	j,
+																) => (
+																	<td
+																		key={
+																			j
+																		}>
+																		{cell || (
+																			<span
+																				className={
+																					styles.missing
+																				}
+																				aria-label='Empty value'>
+																				—
+																			</span>
+																		)}
+																	</td>
+																),
+															)}
+														</tr>
+													),
+												)}
 											</tbody>
 										</table>
 									</div>
-									<p className={styles.hint}>
+									<p
+										className={
+											styles.hint
+										}>
 										{preview.truncated
 											? 'Showing the first 20 records. '
-											: !preview.rows.length
+											: !preview
+														.rows
+														.length
 												? 'This file has headers but no preview records. '
 												: ''}
-										Preview checks do not validate the complete file. Scroll
-										horizontally to see all columns.
+										Preview
+										checks
+										do
+										not
+										validate
+										the
+										complete
+										file.
+										Scroll
+										horizontally
+										to
+										see
+										all
+										columns.
 									</p>
 								</>
 							)

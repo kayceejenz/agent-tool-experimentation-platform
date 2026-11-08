@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from modules.projects.models.project_member_model import ProjectRole
 
@@ -15,6 +15,7 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     role: ProjectRole
+    hidden_sections: list[str] = Field(default_factory=list)
 
 
 class ProjectListResponse(BaseModel):

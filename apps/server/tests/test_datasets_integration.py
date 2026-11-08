@@ -144,3 +144,130 @@ def test_delete_dataset_permissions_and_files(workspace, tmp_path):  # noqa: F81
         )
         == []
     )
+
+
+def test_direct_upload_ticket_scope_replay_expiry_and_cors(workspace, tmp_path):  # noqa: F811
+    client, config, users = workspace
+    config.dataset_storage_root = str(tmp_path)
+    owner, _, viewer, _ = users
+    project = create(client, owner[1])
+    other = create(client, owner[1], "Other")
+    base = f"/api/v1/projects/{project['id']}/datasets"
+    origin = config.auth_origins[0]
+    headers = {**owner[1], "Origin": origin}
+    query(
+        config,
+        "INSERT INTO agent_platform.project_members(project_id,user_id,role) VALUES (%s,%s,'viewer')",
+        (project["id"], viewer[0]),
+    )
+    assert (
+        client.post(
+            base + "/upload-ticket", headers={**viewer[1], "Origin": origin}
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            base + "/upload-ticket",
+            headers={**owner[1], "Origin": "https://evil.invalid"},
+        ).status_code
+        == 403
+    )
+    ticket = client.post(base + "/upload-ticket", headers=headers)
+    assert ticket.status_code == 200, ticket.text
+    assert ticket.json()["file_limit_bytes"] == 128 * 1024 * 1024
+    direct_headers = {
+        "Origin": origin,
+        "Authorization": "Upload " + ticket.json()["token"],
+    }
+    payload = {
+        "data": {"name": "Direct"},
+        "files": {"files": ("data.csv", b"a,b\n1,2\n")},
+    }
+    assert (
+        client.post(
+            base.replace(project["id"], other["id"]) + "/direct-upload",
+            headers=direct_headers,
+            **payload,
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            base + "/direct-upload",
+            headers={**direct_headers, "Origin": "https://evil.invalid"},
+            **payload,
+        ).status_code
+        == 403
+    )
+    preflight = client.options(
+        base + "/direct-upload",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == origin
+    response = client.post(base + "/direct-upload", headers=direct_headers, **payload)
+    assert response.status_code == 201, response.text
+    assert response.headers["access-control-allow-origin"] == origin
+    assert (
+        client.post(
+            base + "/direct-upload", headers=direct_headers, **payload
+        ).status_code
+        == 403
+    )
+    ticket = client.post(base + "/upload-ticket", headers=headers).json()
+    query(
+        config,
+        "UPDATE agent_platform.dataset_upload_tickets SET expires_at=now()-interval '1 second'",
+    )
+    assert (
+        client.post(
+            base + "/direct-upload",
+            headers={**direct_headers, "Authorization": "Upload " + ticket["token"]},
+            **payload,
+        ).status_code
+        == 403
+    )
+    ticket = client.post(base + "/upload-ticket", headers=headers).json()
+    query(
+        config,
+        "DELETE FROM agent_platform.project_members WHERE project_id=%s AND user_id=%s",
+        (project["id"], owner[0]),
+    )
+    assert (
+        client.post(
+            base + "/direct-upload",
+            headers={**direct_headers, "Authorization": "Upload " + ticket["token"]},
+            **payload,
+        ).status_code
+        == 404
+    )
+
+
+def test_direct_upload_larger_than_previous_file_limit(workspace, tmp_path):  # noqa: F811
+    client, config, users = workspace
+    config.dataset_storage_root = str(tmp_path / "inputs")
+    project = create(client, users[0][1])
+    base = f"/api/v1/projects/{project['id']}/datasets"
+    origin = config.auth_origins[0]
+    ticket = client.post(
+        base + "/upload-ticket", headers={**users[0][1], "Origin": origin}
+    ).json()
+    source = tmp_path / "large.csv"
+    with source.open("wb") as output:
+        output.write(b"a,b\n")
+        for _ in range(73):
+            output.write(b"1,2\n" * (1024 * 1024 // 4))
+    with source.open("rb") as data:
+        response = client.post(
+            base + "/direct-upload",
+            headers={"Origin": origin, "Authorization": "Upload " + ticket["token"]},
+            data={"name": "Large"},
+            files={"files": ("large.csv", data, "text/csv")},
+        )
+    assert response.status_code == 201, response.text
+    assert response.json()["files"][0]["size_bytes"] == source.stat().st_size

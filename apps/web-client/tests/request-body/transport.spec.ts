@@ -1,29 +1,78 @@
 import { test, expect } from '@playwright/test';
-import { projectRequest, ProjectRequestError } from '../../src/lib/projects/client';
-import { assertProjectPayload, readJsonResponse, retryDelay } from '../../src/lib/http/response';
-import { permanentPollingError, pollingDelay } from '../../src/lib/agents/polling';
+import {
+	projectRequest,
+	ProjectRequestError,
+} from '../../src/lib/projects/client';
+import {
+	assertProjectPayload,
+	readJsonResponse,
+	retryDelay,
+} from '../../src/lib/http/response';
+import {
+	permanentPollingError,
+	pollingDelay,
+} from '../../src/lib/agents/polling';
+
+import { contentSecurityPolicy } from '../../src/lib/security';
 
 const originalFetch = globalThis.fetch;
-test.afterEach(() => { globalThis.fetch = originalFetch; });
+test.afterEach(() => {
+	globalThis.fetch = originalFetch;
+});
 
 test('HTML and malformed JSON become typed recoverable transport errors', async () => {
-	for (const response of [new Response('<html>bad gateway</html>', { status: 502 }), new Response('{', { headers: { 'Content-Type': 'application/json' } })]) {
+	for (const response of [
+		new Response('<html>bad gateway</html>', { status: 502 }),
+		new Response('{', {
+			headers: { 'Content-Type': 'application/json' },
+		}),
+	]) {
 		globalThis.fetch = async () => response;
-		await expect(projectRequest('/')).rejects.toMatchObject({ status: 503, code: 'invalid_response' });
+		await expect(projectRequest('/')).rejects.toMatchObject({
+			status: 503,
+			code: 'invalid_response',
+		});
 	}
+});
+
+test('hosting upload rejection preserves its size error without parsing HTML', async () => {
+	globalThis.fetch = async () =>
+		new Response('Request Entity Too Large', { status: 413 });
+	await expect(
+		projectRequest('/project/datasets', {
+			method: 'POST',
+			body: new FormData(),
+		}),
+	).rejects.toMatchObject({
+		status: 413,
+		code: 'payload_too_large',
+		message: expect.stringContaining('request size limit'),
+	});
 });
 
 test('missing catalog shape cannot pass a TypeScript generic', async () => {
 	globalThis.fetch = async () => Response.json({ ok: true });
-	await expect(projectRequest('/project/tools?summary=true')).rejects.toMatchObject({ code: 'invalid_response' });
-	expect(() => assertProjectPayload('/project/executions/run?view=status', { id: 'run', status: 'running', final_answer: null })).toThrow();
+	await expect(
+		projectRequest('/project/tools?summary=true'),
+	).rejects.toMatchObject({ code: 'invalid_response' });
+	expect(() =>
+		assertProjectPayload('/project/executions/run?view=status', {
+			id: 'run',
+			status: 'running',
+			final_answer: null,
+		}),
+	).toThrow();
 });
 
 test('caller abort reaches fetch and stays a cancellation', async () => {
 	let aborted = false;
-	globalThis.fetch = async (_input, init) => new Promise((_resolve, reject) => {
-		init!.signal!.addEventListener('abort', () => { aborted = true; reject(init!.signal!.reason); });
-	});
+	globalThis.fetch = async (_input, init) =>
+		new Promise((_resolve, reject) => {
+			init!.signal!.addEventListener('abort', () => {
+				aborted = true;
+				reject(init!.signal!.reason);
+			});
+		});
 	const controller = new AbortController();
 	const pending = projectRequest('/', { signal: controller.signal });
 	controller.abort();
@@ -32,26 +81,110 @@ test('caller abort reaches fetch and stays a cancellation', async () => {
 });
 
 test('Retry-After and permanent failures have distinct polling behavior', async () => {
-	globalThis.fetch = async () => Response.json({ error: 'Slow down' }, { status: 429, headers: { 'Retry-After': '12' } });
-	await expect(projectRequest('/')).rejects.toMatchObject({ status: 429, retryAfterMs: 12000 });
-	expect(permanentPollingError(new ProjectRequestError(404, 'Removed'))).toBe(true);
-	expect(permanentPollingError(new ProjectRequestError(503, 'Unavailable'))).toBe(false);
-	expect(permanentPollingError(new ProjectRequestError(429, 'Busy'))).toBe(false);
+	globalThis.fetch = async () =>
+		Response.json(
+			{ error: 'Slow down' },
+			{ status: 429, headers: { 'Retry-After': '12' } },
+		);
+	await expect(projectRequest('/')).rejects.toMatchObject({
+		status: 429,
+		retryAfterMs: 12000,
+	});
+	expect(
+		permanentPollingError(new ProjectRequestError(404, 'Removed')),
+	).toBe(true);
+	expect(
+		permanentPollingError(
+			new ProjectRequestError(503, 'Unavailable'),
+		),
+	).toBe(false);
+	expect(
+		permanentPollingError(new ProjectRequestError(429, 'Busy')),
+	).toBe(false);
 	expect(pollingDelay(1, 0, 0.5)).toBe(2000);
 	expect(pollingDelay(2, 0, 0.5)).toBe(4000);
 	expect(pollingDelay(8, 0, 0.5)).toBe(30000);
 	expect(pollingDelay(1, 60000, 0.5)).toBe(60000);
-	expect(retryDelay('Thu, 08 Oct 2026 12:00:00 GMT', Date.parse('2026-10-08T11:59:50Z'))).toBe(10000);
-	await expect(readJsonResponse(Response.json({ ok: true }))).resolves.toEqual({ ok: true });
+	expect(
+		retryDelay(
+			'Thu, 08 Oct 2026 12:00:00 GMT',
+			Date.parse('2026-10-08T11:59:50Z'),
+		),
+	).toBe(10000);
+	await expect(
+		readJsonResponse(Response.json({ ok: true })),
+	).resolves.toEqual({ ok: true });
 });
 
-
 test('evaluation envelopes reject malformed reports before rendering', () => {
-    const path = '/project/executions/run/evaluations';
-    expect(() => assertProjectPayload(path, { items: [], next_offset: null })).not.toThrow();
-    expect(() => assertProjectPayload(path, { ok: true })).toThrow();
-    const item = { id: 'evaluation', attempt: 1, status: 'completed', profile: { model: 'judge', rubric_version: 1 }, metrics: null,
-        report: { task_outcome: 'unknown', overall_verdict: 'unknown', checks: [], requirements: [], critical_failures: [], limitations: [] } };
-    expect(() => assertProjectPayload(path, { items: [item], next_offset: null })).not.toThrow();
-    expect(() => assertProjectPayload(path, { items: [{ ...item, report: { ...item.report, checks: [{}] } }], next_offset: null })).toThrow();
+	const path = '/project/executions/run/evaluations';
+	expect(() =>
+		assertProjectPayload(path, { items: [], next_offset: null }),
+	).not.toThrow();
+	expect(() => assertProjectPayload(path, { ok: true })).toThrow();
+	const item = {
+		id: 'evaluation',
+		attempt: 1,
+		status: 'completed',
+		profile: { model: 'judge', rubric_version: 1 },
+		metrics: null,
+		report: {
+			task_outcome: 'unknown',
+			overall_verdict: 'unknown',
+			checks: [],
+			requirements: [],
+			critical_failures: [],
+			limitations: [],
+		},
+	};
+	expect(() =>
+		assertProjectPayload(path, {
+			items: [item],
+			next_offset: null,
+		}),
+	).not.toThrow();
+	expect(() =>
+		assertProjectPayload(path, {
+			items: [
+				{
+					...item,
+					report: {
+						...item.report,
+						checks: [{}],
+					},
+				},
+			],
+			next_offset: null,
+		}),
+	).toThrow();
+});
+
+test('direct uploads allow only the configured API origin in connect-src', () => {
+	const policy = contentSecurityPolicy(
+		'test-nonce',
+		false,
+		true,
+		'https://api.example.com/base',
+	);
+	expect(
+		policy
+			.split('; ')
+			.find(value => value.startsWith('connect-src')),
+	).toBe("connect-src 'self' https://api.example.com");
+	expect(
+		contentSecurityPolicy(
+			'test-nonce',
+			false,
+			true,
+			'http://api.example.com',
+		),
+	).not.toContain('http://api.example.com');
+	expect(
+		contentSecurityPolicy(
+			'test-nonce',
+			true,
+			false,
+			'http://127.0.0.1:8001',
+		),
+	).toContain('http://127.0.0.1:8001');
 });
